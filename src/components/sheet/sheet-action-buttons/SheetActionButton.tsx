@@ -24,6 +24,7 @@ type Props = PropsWithChildren<{
   label?: string;
   lightShadows?: boolean;
   marginBottom?: number;
+  newShadows?: boolean;
   nftShadows?: boolean;
   onPress?: () => void;
   scaleTo?: number;
@@ -39,23 +40,19 @@ type Props = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
 }>;
 
-const addChartsStyling = (isCharts: boolean) =>
-  isCharts ? { position: 'absolute', width: '100%' } : {};
+const addChartsStyling = (isCharts: boolean) => (isCharts ? { position: 'absolute', width: '100%' } : {});
 
-const Button = styled(Centered)(
-  ({ isCharts, size }: { isCharts?: boolean; size?: string }) => ({
-    ...addChartsStyling(!!isCharts),
-    height: size === 'big' ? 56 : 46,
-  })
-);
+const Button = styled(Centered)(({ isCharts, size }: { isCharts?: boolean; size?: string }) => ({
+  ...addChartsStyling(!!isCharts),
+  height: size === 'big' ? 52 : 46,
+}));
 
 const Content = styled(RowWithMargins).attrs({
   align: 'center',
   margin: 4,
 })({
-  height: ({ size }: Pick<Props, 'size'>) => (size === 'big' ? 56 : 46),
-  paddingBottom: ({ label }: Pick<Props, 'label'>) =>
-    label && containsEmoji(label) ? 2.5 : 1,
+  height: ({ size }: Pick<Props, 'size'>) => (size === 'big' ? 52 : 46),
+  paddingBottom: ({ label }: Pick<Props, 'label'>) => (label && containsEmoji(label) ? 2.5 : 1),
   paddingHorizontal: 19,
   zIndex: 1,
 });
@@ -76,7 +73,7 @@ const WhiteButtonGradient = React.memo(
 );
 
 const SheetActionButton: React.FC<Props> = ({
-  borderRadius = 56,
+  borderRadius = 52,
   children,
   color: givenColor,
   disabled = false,
@@ -89,6 +86,7 @@ const SheetActionButton: React.FC<Props> = ({
   label = null,
   lightShadows,
   onPress,
+  newShadows,
   nftShadows,
   scaleTo = 0.9,
   size = null,
@@ -105,44 +103,34 @@ const SheetActionButton: React.FC<Props> = ({
   const isWhite = color === colors.white;
   const textColor = givenTextColor || colors.whiteLabel;
   const shadowsForButtonColor = useMemo(() => {
-    if (nftShadows) {
+    if (newShadows) {
+      return [
+        [0, 2, 6, colors.trueBlack, 0.02],
+        [0, 10, 30, isDarkMode ? colors.shadow : color, 0.4],
+      ];
+    } else if (nftShadows) {
       return [[0, 10, 30, colors.alpha(colors.shadowBlack, 0.3)]];
     } else if (!forceShadows && (disabled || isTransparent)) {
       return [[0, 0, 0, colors.transparent, 0]];
     } else
       return [
         [0, 10, 30, colors.shadow, isWhite ? 0.12 : lightShadows ? 0.15 : 0.2],
-        [
-          0,
-          5,
-          15,
-          isDarkMode || isWhite ? colors.shadow : color,
-          isWhite ? 0.08 : lightShadows ? 0.3 : 0.4,
-        ],
+        [0, 5, 15, isDarkMode || isWhite ? colors.shadow : color, isWhite ? 0.08 : lightShadows ? 0.3 : 0.4],
       ];
-  }, [
-    color,
-    colors,
-    disabled,
-    forceShadows,
-    isTransparent,
-    isDarkMode,
-    lightShadows,
-    nftShadows,
-    isWhite,
-  ]);
+  }, [color, colors, disabled, forceShadows, isTransparent, isDarkMode, lightShadows, newShadows, nftShadows, isWhite]);
 
   return (
     <Button
       as={ButtonPressAnimation}
       contentContainerStyle={{
-        height: size === 'big' ? 56 : 46,
+        height: size === 'big' ? 52 : 46,
       }}
       elevation={android ? elevation : null}
       isCharts={isCharts}
       onPress={disabled ? () => undefined : onPress}
       overflowMargin={30}
       radiusAndroid={borderRadius}
+      borderRadius={borderRadius}
       scaleTo={disabled ? 1 : scaleTo}
       size={size}
       testID={`${testID}-action-button`}
@@ -156,7 +144,7 @@ const SheetActionButton: React.FC<Props> = ({
         {...position.coverAsObject}
         backgroundColor={color}
         borderRadius={borderRadius}
-        height={size === 'big' ? 56 : 46}
+        height={size === 'big' ? 52 : 46}
         shadows={shadowsForButtonColor}
       >
         {isWhite && <WhiteButtonGradient colors={colors} />}
@@ -177,7 +165,7 @@ const SheetActionButton: React.FC<Props> = ({
           <Text
             align="center"
             color={textColor}
-            lineHeight={size === 'big' ? 56 : 46}
+            lineHeight={size === 'big' ? 52 : 46}
             numberOfLines={truncate ? 1 : undefined}
             size={textSize ?? (size === 'big' ? 'larger' : 'large')}
             style={{ width: '100%' }}

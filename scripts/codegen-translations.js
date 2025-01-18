@@ -2,7 +2,7 @@
 
 // This script reads language keys from a file and generates a TypeScript
 // declaration file to type `lang.t` calls. The language file to use within
-// `src/languages/` defaults to `_english.json`, and can be specified as an
+// `src/languages/` defaults to `en_US.json`, and can be specified as an
 // argument.
 //
 // This script can be invoked as
@@ -17,7 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const languageFilename = process.argv[2] ?? '_english.json';
+const languageFilename = process.argv[2] ?? 'en_US.json';
 const maxLineLength = 80;
 
 /**
@@ -97,7 +97,7 @@ type ValidScope =${validTagsAsArrays.map(generateTypeForTag).join('')};
  * keys.
  */
 function pushNestedKeysAsArrays(keysArray, object, prefixArray) {
-  for (let key in object) {
+  for (const key in object) {
     const keyRepresentation = prefixArray.concat([key]);
     keysArray.push(keyRepresentation);
 
@@ -114,11 +114,7 @@ function pushNestedKeysAsArrays(keysArray, object, prefixArray) {
  * @returns {Object} The parsed language object.
  */
 function loadLanguageJson() {
-  const languageFilePath = path.resolve(
-    __dirname,
-    '../src/languages/',
-    languageFilename
-  );
+  const languageFilePath = path.resolve(__dirname, '../src/languages/', languageFilename);
 
   const languageContents = fs.readFileSync(languageFilePath, 'utf-8');
   return JSON.parse(languageContents)['translation'];
@@ -131,10 +127,7 @@ function loadLanguageJson() {
  * @param {string} contents The contents of the declaration file.
  */
 function writeTypeDeclarationFile(contents) {
-  const declarationFilePath = path.resolve(
-    __dirname,
-    '../src/languages/types-generated.d.ts'
-  );
+  const declarationFilePath = path.resolve(__dirname, '../src/languages/types-generated.d.ts');
 
   fs.writeFileSync(declarationFilePath, contents, 'utf-8');
 }

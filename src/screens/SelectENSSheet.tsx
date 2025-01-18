@@ -5,29 +5,13 @@ import { FlatList } from 'react-native-gesture-handler';
 import ButtonPressAnimation from '../components/animations/ButtonPressAnimation';
 import { Sheet } from '../components/sheet';
 import { abbreviateEnsForDisplay } from '@/utils/abbreviations';
-import {
-  AccentColorProvider,
-  Bleed,
-  Box,
-  Heading,
-  Inline,
-  Inset,
-  Stack,
-  Text,
-  useForegroundColor,
-} from '@/design-system';
-import {
-  prefetchENSAvatar,
-  prefetchENSCover,
-  prefetchENSRecords,
-  useAccountENSDomains,
-  useENSAvatar,
-} from '@/hooks';
+import { AccentColorProvider, Bleed, Box, Heading, Inline, Inset, Stack, Text, useForegroundColor } from '@/design-system';
+import { prefetchENSAvatar, prefetchENSCover, prefetchENSRecords, useAccountENSDomains, useENSAvatar } from '@/hooks';
 import { ImgixImage } from '@/components/images';
 import { useNavigation } from '@/navigation';
 import { useTheme } from '@/theme';
 import { deviceUtils } from '@/utils';
-import { ListRenderItem } from 'react-native';
+import { ListRenderItem, View } from 'react-native';
 import { BaseEnsDomainFragment } from '@/graphql/__generated__/ens';
 
 export const SelectENSSheetHeight = 400;
@@ -38,11 +22,7 @@ const rowPadding = 19;
 const maxListHeight = deviceHeight - 220;
 
 export default function SelectENSSheet() {
-  const {
-    isSuccess,
-    nonPrimaryDomains,
-    primaryDomain,
-  } = useAccountENSDomains();
+  const { isSuccess, nonPrimaryDomains, primaryDomain } = useAccountENSDomains();
 
   const secondary06 = useForegroundColor('secondary06 (Deprecated)');
 
@@ -71,21 +51,17 @@ export default function SelectENSSheet() {
     return sortedNonPrimaryDomains;
   }, [primaryDomain, nonPrimaryDomains]);
 
-  let listHeight =
-    (rowHeight + rowPadding) * (controlledDomains?.length || 0) + 21;
+  let listHeight = (rowHeight + rowPadding) * (controlledDomains?.length || 0) + 21;
   let scrollEnabled = false;
   if (listHeight > maxListHeight) {
     listHeight = maxListHeight;
     scrollEnabled = true;
   }
 
-  const renderItem: ListRenderItem<{ name: string }> = useCallback(
+  const renderItem: ListRenderItem<BaseEnsDomainFragment> = useCallback(
     ({ item }) => {
       return (
-        <ButtonPressAnimation
-          onPress={() => handleSelectENS(item.name)}
-          scaleTo={0.95}
-        >
+        <ButtonPressAnimation onPress={() => item.name && handleSelectENS(item.name)} scaleTo={0.95}>
           <Inline alignHorizontal="justify" alignVertical="center" wrap={false}>
             <Inline alignVertical="center" wrap={false}>
               <AccentColorProvider color={secondary06}>
@@ -97,16 +73,11 @@ export default function SelectENSSheet() {
                   justifyContent="center"
                   width={{ custom: rowHeight }}
                 >
-                  <ENSAvatar name={item.name} />
+                  <ENSAvatar name={item.name ?? ''} />
                 </Box>
                 <Box paddingLeft="10px">
-                  <Text
-                    numberOfLines={1}
-                    color="primary (Deprecated)"
-                    size="16px / 22px (Deprecated)"
-                    weight="bold"
-                  >
-                    {abbreviateEnsForDisplay(item.name, 25)}
+                  <Text numberOfLines={1} color="primary (Deprecated)" size="16px / 22px (Deprecated)" weight="bold">
+                    {abbreviateEnsForDisplay(item.name ?? '', 25)}
                   </Text>
                 </Box>
               </AccentColorProvider>
@@ -119,38 +90,30 @@ export default function SelectENSSheet() {
   );
 
   return (
-    // @ts-expect-error JavaScript component
     <Sheet>
       <Inset top="6px">
         <Stack space="24px">
-          <Heading
-            align="center"
-            color="primary (Deprecated)"
-            size="18px / 21px (Deprecated)"
-            weight="heavy"
-          >
+          <Heading align="center" color="primary (Deprecated)" size="18px / 21px (Deprecated)" weight="heavy">
             {lang.t('profiles.select_ens_name')}
           </Heading>
           {isSuccess && (
             <Bleed bottom={{ custom: scrollEnabled ? 34 : 26 }}>
-              <Box
-                ItemSeparatorComponent={() => (
-                  <Box height={{ custom: rowPadding }} />
-                )}
-                as={FlatList}
-                contentContainerStyle={{
-                  paddingBottom: 50,
-                  paddingHorizontal: 19,
-                }}
-                data={controlledDomains}
-                height={{ custom: listHeight }}
-                initialNumToRender={15}
-                keyExtractor={({ domain }: { domain: string }) => domain}
-                maxToRenderPerBatch={10}
-                renderItem={renderItem}
-                scrollEnabled={scrollEnabled}
-                showsVerticalScrollIndicator={false}
-              />
+              <View style={{ height: listHeight }}>
+                <FlatList
+                  ItemSeparatorComponent={() => <Box height={{ custom: rowPadding }} />}
+                  data={controlledDomains}
+                  contentContainerStyle={{
+                    paddingBottom: 50,
+                    paddingHorizontal: 19,
+                  }}
+                  initialNumToRender={15}
+                  keyExtractor={(item, index) => item.name ?? index.toString()}
+                  maxToRenderPerBatch={10}
+                  renderItem={renderItem}
+                  scrollEnabled={scrollEnabled}
+                  showsVerticalScrollIndicator={false}
+                />
+              </View>
             </Bleed>
           )}
         </Stack>
@@ -179,12 +142,7 @@ function ENSAvatar({ name }: { name: string }) {
 
   return (
     <AccentColorProvider color={colors.blueGreyDark30}>
-      <Text
-        align="right"
-        color="accent"
-        size="20px / 24px (Deprecated)"
-        weight="bold"
-      >
+      <Text align="right" color="accent" size="20px / 24px (Deprecated)" weight="bold">
         􀉭
       </Text>
     </AccentColorProvider>

@@ -1,31 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions } from 'react-native';
 import dogSunglasses from '@/assets/partnerships/dogSunglasses.png';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Spinner from '../../assets/chartSpinner.png';
 import { nativeStackConfig } from '../../navigation/nativeStackConfig';
 import { ChartExpandedStateHeader } from '../expanded-state/chart';
 import { Column } from '../layout';
 import Labels from './ExtremeLabels';
 import TimespanSelector from './TimespanSelector';
-import {
-  ChartDot,
-  ChartPath,
-  useChartData,
-} from '@/react-native-animated-charts/src';
+import { ChartDot, ChartPath, useChartData } from '@/react-native-animated-charts/src';
 import ChartTypes from '@/helpers/chartTypes';
 import { ImgixImage } from '@/components/images';
 import { useNavigation } from '@/navigation';
 import styled from '@/styled-thing';
 import { position } from '@/styles';
 import { DOG_ADDRESS } from '@/references';
+import { IS_IOS } from '@/env';
 
 export const { width: WIDTH } = Dimensions.get('window');
 
@@ -35,7 +25,7 @@ const ChartTimespans = [
   ChartTypes.week,
   ChartTypes.month,
   ChartTypes.year,
-  //ChartTypes.max, todo restore after receiving proper data from zerion
+  // ChartTypes.max, todo restore after receiving proper data from zerion
 ];
 
 const ChartContainer = styled.View({
@@ -54,7 +44,7 @@ const ChartSpinner = styled(ImgixImage).attrs(({ color }) => ({
 
 const Container = styled(Column)({
   paddingBottom: 30,
-  paddingTop: ios ? 0 : 20,
+  paddingTop: IS_IOS ? 0 : 4,
   width: '100%',
 });
 
@@ -62,8 +52,7 @@ const InnerDot = styled.View({
   backgroundColor: ({ color }) => color,
   borderRadius: 5,
   height: 10,
-  shadowColor: ({ color, theme: { colors, isDarkMode } }) =>
-    isDarkMode ? colors.shadow : color,
+  shadowColor: ({ color, theme: { colors, isDarkMode } }) => (isDarkMode ? colors.shadow : color),
   shadowOffset: { height: 3, width: 0 },
   shadowOpacity: 0.6,
   shadowRadius: 4.5,
@@ -127,15 +116,14 @@ export default function ChartWrapper({
   color,
   fetchingCharts,
   isPool,
+  latestChange,
   updateChartType,
   showChart,
   testID,
   throttledData,
   ...props
 }) {
-  const timespanIndex = useMemo(() => ChartTimespans.indexOf(chartType), [
-    chartType,
-  ]);
+  const timespanIndex = useMemo(() => ChartTimespans.indexOf(chartType), [chartType]);
 
   const { progress } = useChartData();
   const spinnerRotation = useSharedValue(0);
@@ -164,18 +152,11 @@ export default function ChartWrapper({
     if (showLoadingState) {
       clearTimeout(spinnerTimeout.current);
       spinnerRotation.value = 0;
-      spinnerRotation.value = withRepeat(
-        withTiming(360, rotationConfig),
-        -1,
-        false
-      );
+      spinnerRotation.value = withRepeat(withTiming(360, rotationConfig), -1, false);
       spinnerScale.value = withTiming(1, timingConfig);
     } else {
       spinnerScale.value = withTiming(0, timingConfig);
-      spinnerTimeout.current = setTimeout(
-        () => (spinnerRotation.value = 0),
-        timingConfig.duration
-      );
+      spinnerTimeout.current = setTimeout(() => (spinnerRotation.value = 0), timingConfig.duration);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showLoadingState]);
@@ -189,10 +170,7 @@ export default function ChartWrapper({
   const spinnerStyle = useAnimatedStyle(() => {
     return {
       opacity: spinnerScale.value,
-      transform: [
-        { rotate: `${spinnerRotation.value}deg` },
-        { scale: spinnerScale.value },
-      ],
+      transform: [{ rotate: `${spinnerRotation.value}deg` }, { scale: spinnerScale.value }],
     };
   });
   const isDOG = props.asset.address === DOG_ADDRESS;
@@ -204,6 +182,7 @@ export default function ChartWrapper({
         chartType={chartType}
         color={color}
         isPool={isPool}
+        latestChange={latestChange}
         showChart={showChart}
         testID={testID}
       />

@@ -29,7 +29,7 @@ export const PoolValue = ({ type, value, simple, ...props }) => {
   const { nativeCurrency } = useAccountSettings();
 
   if (type === 'annualized_fees') {
-    let percent = parseFloat(value);
+    const percent = parseFloat(value);
     if (!percent || percent === 0) {
       formattedValue = '0%';
     }
@@ -42,7 +42,7 @@ export const PoolValue = ({ type, value, simple, ...props }) => {
       formattedValue = '< 0.0001%';
     }
 
-    let fixedPercent = percent.toFixed(2);
+    const fixedPercent = percent.toFixed(2);
     if (fixedPercent === '0.00') {
       formattedValue = '0%';
     }
@@ -64,10 +64,7 @@ export const PoolValue = ({ type, value, simple, ...props }) => {
     formattedValue = bigNumberFormat(value, nativeCurrency, value >= 10000);
   }
   return (
-    <PoolValueWrapper
-      backgroundColor={colors.alpha(color, simple ? 0 : 0.06)}
-      simple={simple}
-    >
+    <PoolValueWrapper backgroundColor={colors.alpha(color, simple ? 0 : 0.06)} simple={simple}>
       <PoolValueText color={color} simple={simple} {...props}>
         {formattedValue}
       </PoolValueText>

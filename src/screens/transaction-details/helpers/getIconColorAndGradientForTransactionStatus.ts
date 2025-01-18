@@ -3,21 +3,19 @@ import { ThemeContextProps } from '@/theme';
 
 export function getIconColorAndGradientForTransactionStatus(
   colors: ThemeContextProps['colors'],
-  status?: TransactionStatus,
-  pending?: boolean
+  status?: TransactionStatus
 ): {
   icon: string;
   color: 'red' | 'blue' | 'labelSecondary';
   gradient: string[];
 } {
-  if (pending) {
+  if (status === TransactionStatus.pending) {
     return {
       icon: '􀖇',
       color: 'labelSecondary',
       gradient: colors.gradients.transparentToLightGrey,
     };
-  }
-  if (status === TransactionStatus.failed) {
+  } else if (status === TransactionStatus.failed) {
     return {
       icon: '􀆄',
       color: 'red',

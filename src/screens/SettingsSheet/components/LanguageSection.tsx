@@ -1,3 +1,4 @@
+import lang from 'i18n-js';
 import React, { useCallback } from 'react';
 import { resources, supportedLanguages } from '../../../languages';
 import Menu from './Menu';
@@ -6,6 +7,8 @@ import MenuItem from './MenuItem';
 import { analytics } from '@/analytics';
 import { pickBy } from '@/helpers/utilities';
 import { useAccountSettings } from '@/hooks';
+import { BackgroundProvider, Box, Inline, Inset, Text } from '@/design-system';
+import { SimpleSheet } from '@/components/sheet/SimpleSheet';
 
 const languagesWithWalletTranslations = Object.keys(
   pickBy(resources, language => language?.translation?.wallet) // Only show languages that have 'wallet' translations available.
@@ -13,7 +16,7 @@ const languagesWithWalletTranslations = Object.keys(
 
 const languageListItems = languagesWithWalletTranslations.map(code => ({
   code,
-  name: (supportedLanguages as any)[code],
+  name: (supportedLanguages as any)[code].label,
 }));
 
 const LanguageSection = () => {
@@ -34,9 +37,7 @@ const LanguageSection = () => {
           <MenuItem
             key={code}
             onPress={() => onSelectLanguage(code)}
-            rightComponent={
-              code === language && <MenuItem.StatusIcon status="selected" />
-            }
+            rightComponent={code === language && <MenuItem.StatusIcon status="selected" />}
             size={52}
             titleComponent={<MenuItem.Title text={name} />}
           />

@@ -1,15 +1,19 @@
-/** @type {import('ts-jest/dist/types').InitialOptionsTsJest} */
+/* eslint-disable @typescript-eslint/no-var-requires */
+/** @type {import('ts-jest/dist/types').JestConfigWithTsJest} */
 const { pathsToModuleNameMapper } = require('ts-jest');
 const { compilerOptions } = require('../tsconfig');
 
 module.exports = {
-  maxWorkers: 1,
   setupFilesAfterEnv: ['./init.js'],
   testEnvironment: './environment',
-  testTimeout: 240000,
+
+  globalSetup: 'detox/runners/jest/globalSetup',
+  globalTeardown: 'detox/runners/jest/globalTeardown',
+  reporters: ['detox/runners/jest/reporter'],
+
+  testTimeout: 300_000,
   testRegex: '\\.spec\\.[jt]sx?$',
-  reporters: ['detox/runners/jest/streamlineReporter'],
-  verbose: true,
+  verbose: false,
   transform: {
     '\\.[jt]sx?$': 'ts-jest',
   },

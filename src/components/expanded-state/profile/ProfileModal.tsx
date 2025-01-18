@@ -1,7 +1,7 @@
 import lang from 'i18n-js';
 import React, { useCallback, useRef } from 'react';
 import { View } from 'react-native';
-import Divider from '../../Divider';
+import Divider from '@/components/Divider';
 import { ButtonPressAnimation } from '../../animations';
 import { BiometricButtonContent } from '../../buttons';
 import CopyTooltip from '../../copy-tooltip';
@@ -14,16 +14,14 @@ import styled from '@/styled-thing';
 import { margin, padding, position } from '@/styles';
 import { useTheme } from '@/theme';
 
-const ProfileAddressText = styled(TruncatedAddress).attrs(
-  ({ theme: { colors } }: any) => ({
-    align: 'center',
-    color: colors.alpha(colors.blueGreyDark, 0.6),
-    firstSectionLength: 4,
-    size: 'large',
-    truncationLength: 4,
-    weight: 'bold',
-  })
-)({
+const ProfileAddressText = styled(TruncatedAddress).attrs(({ theme: { colors } }: any) => ({
+  align: 'center',
+  color: colors.alpha(colors.blueGreyDark, 0.6),
+  firstSectionLength: 4,
+  size: 'large',
+  truncationLength: 4,
+  weight: 'bold',
+}))({
   ...margin.object(android ? 0 : 6, 0, android ? 0 : 5),
   width: '100%',
 });
@@ -59,12 +57,12 @@ const Container = styled(ProfileModalContainer).attrs({
 });
 
 type ProfileModalProps = {
-  address: string;
-  imageAvatar: string;
-  emojiAvatar: string;
-  accentColor: string;
-  toggleSubmitButtonIcon: boolean;
-  toggleAvatar: boolean;
+  address?: string;
+  imageAvatar?: string;
+  emojiAvatar?: string;
+  accentColor?: string;
+  toggleSubmitButtonIcon?: boolean;
+  toggleAvatar?: boolean;
   handleSubmit: () => void;
   onChange: (value: string) => void;
   inputValue: string;
@@ -90,18 +88,11 @@ const ProfileModal = ({
   const { colors, isDarkMode } = useTheme();
   const inputRef = useRef<any>(null);
 
-  const handleTriggerFocusInput = useCallback(() => inputRef.current?.focus(), [
-    inputRef,
-  ]);
+  const handleTriggerFocusInput = useCallback(() => inputRef.current?.focus(), [inputRef]);
 
   return (
     <Container>
-      <Centered
-        direction="column"
-        paddingBottom={android ? 15 : 30}
-        testID="wallet-info-modal"
-        width="100%"
-      >
+      <Centered direction="column" paddingBottom={android ? 15 : 30} testID="wallet-info-modal" width="100%">
         {toggleAvatar &&
           (imageAvatar ? (
             <AvatarCircle
@@ -145,11 +136,7 @@ const ProfileModal = ({
       </Centered>
       <ColumnWithDividers dividerRenderer={ProfileDivider} width="100%">
         <ProfileButton onPress={handleSubmit}>
-          <BiometricButtonContent
-            label={submitButtonText}
-            showIcon={toggleSubmitButtonIcon}
-            testID="wallet-info-submit-button"
-          />
+          <BiometricButtonContent label={submitButtonText} showIcon={toggleSubmitButtonIcon} testID="wallet-info-submit-button" />
         </ProfileButton>
         <ProfileButton onPress={handleCancel}>
           <ProfileButtonText

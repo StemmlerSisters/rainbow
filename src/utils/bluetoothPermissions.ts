@@ -15,48 +15,38 @@ import {
  * Shows an alert if device's bluetooth is powered off
  */
 export const showBluetoothPoweredOffAlert = async () => {
-  await Alert.alert(
-    i18n.t(i18n.l.bluetooth.powered_off_alert.title),
-    i18n.t(i18n.l.bluetooth.powered_off_alert.message),
-    [
-      {
-        onPress: () => {
-          IS_IOS
-            ? Linking.openURL('App-Prefs:Bluetooth')
-            : Linking.sendIntent('android.settings.BLUETOOTH_SETTINGS');
-        },
-        text: i18n.t(i18n.l.bluetooth.powered_off_alert.open_settings),
+  await Alert.alert(i18n.t(i18n.l.bluetooth.powered_off_alert.title), i18n.t(i18n.l.bluetooth.powered_off_alert.message), [
+    {
+      onPress: () => {
+        IS_IOS ? Linking.openURL('App-Prefs:Bluetooth') : Linking.sendIntent('android.settings.BLUETOOTH_SETTINGS');
       },
-      {
-        onPress: () => null,
-        style: 'cancel',
-        text: i18n.t(i18n.l.bluetooth.powered_off_alert.cancel),
-      },
-    ]
-  );
+      text: i18n.t(i18n.l.bluetooth.powered_off_alert.open_settings),
+    },
+    {
+      onPress: () => null,
+      style: 'cancel',
+      text: i18n.t(i18n.l.bluetooth.powered_off_alert.cancel),
+    },
+  ]);
 };
 
 /**
  * Shows an alert w/ deeplink to settings to enable bluetooth permissions for iOS
  */
 export const showBluetoothPermissionsAlert = async () => {
-  await Alert.alert(
-    i18n.t(i18n.l.bluetooth.permissions_alert.title),
-    i18n.t(i18n.l.bluetooth.permissions_alert.message),
-    [
-      {
-        onPress: () => {
-          Linking.openSettings();
-        },
-        text: i18n.t(i18n.l.bluetooth.permissions_alert.open_settings),
+  await Alert.alert(i18n.t(i18n.l.bluetooth.permissions_alert.title), i18n.t(i18n.l.bluetooth.permissions_alert.message), [
+    {
+      onPress: () => {
+        Linking.openSettings();
       },
-      {
-        onPress: () => null,
-        style: 'cancel',
-        text: i18n.t(i18n.l.bluetooth.permissions_alert.cancel),
-      },
-    ]
-  );
+      text: i18n.t(i18n.l.bluetooth.permissions_alert.open_settings),
+    },
+    {
+      onPress: () => null,
+      style: 'cancel',
+      text: i18n.t(i18n.l.bluetooth.permissions_alert.cancel),
+    },
+  ]);
 };
 
 /**
@@ -70,7 +60,7 @@ export const checkAndRequestAndroidBluetooth = async (): Promise<boolean> => {
   ];
 
   const res = await checkForMultiplePermissions(ANDROID_BT_PERMISSION);
-  logger.debug('[Bluetooth] Android Permission status: ', { res });
+  logger.debug('[bluetoothPermissions]: Android Permission status: ', { res });
 
   const deniedPermissions: AndroidPermission[] = [];
 
@@ -82,13 +72,13 @@ export const checkAndRequestAndroidBluetooth = async (): Promise<boolean> => {
   }
 
   if (deniedPermissions.length === 0) {
-    logger.debug('[Bluetooth] Android Permissions all granted');
+    logger.debug('[bluetoothPermissions]: Android Permissions all granted');
     return true;
   }
   // if we're only missing one, only request one
   else if (deniedPermissions.length === 1) {
     const askResult = await requestPermission(deniedPermissions[0]);
-    logger.debug('[Bluetooth] Android Permission single askResult: ', {
+    logger.debug('[bluetoothPermissions]: Android Permission single askResult: ', {
       askResult,
     });
     if (askResult === RESULTS.GRANTED) {
@@ -107,10 +97,7 @@ export const checkAndRequestAndroidBluetooth = async (): Promise<boolean> => {
     // else request in a group
   } else if (deniedPermissions.length > 1) {
     const askResults = await requestMultiplePermissions(deniedPermissions);
-    logger.debug(
-      '[Bluetooth] Android Bluetooth Permission multiple askResult: ',
-      { askResults }
-    );
+    logger.debug('[bluetoothPermissions]: Android Bluetooth Permission multiple askResult: ', { askResults });
 
     const deniedOrBlockedPermissions: AndroidPermission[] = [];
     // check if we are missing any permissions

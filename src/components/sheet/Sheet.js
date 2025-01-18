@@ -10,14 +10,7 @@ import SheetHandle from './SheetHandle';
 import { useDimensions } from '@/hooks';
 import { borders } from '@/styles';
 
-const Sheet = ({
-  borderRadius,
-  children,
-  hideHandle,
-  noInsets,
-  paddingBottom = 7,
-  paddingTop = 6,
-}) => {
+const Sheet = ({ borderRadius, children, hideHandle, noInsets = false, paddingBottom = 7, paddingTop = 6 }) => {
   const { width } = useDimensions();
   const { goBack } = useNavigation();
   const insets = useSafeAreaInsets();
@@ -43,7 +36,6 @@ const Sheet = ({
 
 Sheet.propTypes = {
   borderRadius: PropTypes.number,
-  children: PropTypes.node,
   hideHandle: PropTypes.bool,
 };
 

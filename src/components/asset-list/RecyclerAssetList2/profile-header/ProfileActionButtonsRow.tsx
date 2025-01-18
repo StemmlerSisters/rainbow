@@ -1,43 +1,24 @@
-import Clipboard from '@react-native-community/clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 import lang from 'i18n-js';
 import * as React from 'react';
-import { PressableProps } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useDerivedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import { InteractionManager, PressableProps } from 'react-native';
+import Animated, { useAnimatedStyle, useDerivedValue, withSpring } from 'react-native-reanimated';
 import { ButtonPressAnimation } from '@/components/animations';
+import { CopyFloatingEmojis } from '@/components/floating-emojis';
 import { enableActionsOnReadOnlyWallet } from '@/config';
-import {
-  AccentColorProvider,
-  Box,
-  Column,
-  Columns,
-  Inset,
-  Stack,
-  Text,
-  useColorMode,
-} from '@/design-system';
-import { CurrencySelectionTypes, ExchangeModalTypes } from '@/helpers';
-import {
-  useAccountProfile,
-  useSwapCurrencyHandlers,
-  useWalletConnectConnections,
-  useWallets,
-} from '@/hooks';
-import { delayNext } from '@/hooks/useMagicAutofocus';
+import { AccentColorProvider, Box, Column, Columns, Inset, Stack, Text, useColorMode } from '@/design-system';
+import { useAccountProfile, useWallets } from '@/hooks';
 import { useNavigation } from '@/navigation';
 import { watchingAlert } from '@/utils';
 import Routes from '@rainbow-me/routes';
 import showWalletErrorAlert from '@/helpers/support';
-import { analytics, analyticsV2 } from '@/analytics';
-import ContextMenuButton from '@/components/native-context-menu/contextMenu';
+import { analytics } from '@/analytics';
 import { useRecoilState } from 'recoil';
-import config from '@/model/config';
+import { useRemoteConfig } from '@/model/remoteConfig';
 import { useAccountAccentColor } from '@/hooks/useAccountAccentColor';
 import { addressCopiedToastAtom } from '@/recoil/addressCopiedToastAtom';
-import { useWalletConnectV2Sessions } from '@/walletConnect/hooks/useWalletConnectV2Sessions';
+import { swapsStore } from '@/state/swaps/swapsStore';
+import { userAssetsStore } from '@/state/assets/userAssets';
 
 export const ProfileActionButtonsRowHeight = 80;
 
@@ -58,10 +39,9 @@ export function ProfileActionButtonsRow() {
     ],
   }));
 
-  if (!accentColorLoaded) return null;
+  const { f2c_enabled: addCashEnabled, swagg_enabled: swapEnabled } = useRemoteConfig();
 
-  const addCashEnabled = config.f2c_enabled;
-  const swapEnabled = config.swagg_enabled;
+  if (!accentColorLoaded) return null;
 
   return (
     <Box width="full">
@@ -89,7 +69,7 @@ export function ProfileActionButtonsRow() {
             </Column>
             <Column>
               <Animated.View style={[expandStyle]}>
-                <MoreButton />
+                <CopyButton />
               </Animated.View>
             </Column>
           </Columns>
@@ -112,7 +92,7 @@ function ActionButton({
 }) {
   const { colorMode } = useColorMode();
   return (
-    <ButtonPressAnimation onPress={onPress} scale={0.8} testID={testID}>
+    <ButtonPressAnimation onPress={onPress} pointerEvents="box-only" scale={0.8} testID={testID}>
       <Stack alignHorizontal="center" space="10px">
         <Box
           alignItems="center"
@@ -151,11 +131,7 @@ function ActionButton({
             {icon}
           </Text>
         </Box>
-        <Text
-          color="secondary80 (Deprecated)"
-          size="14px / 19px (Deprecated)"
-          weight="medium"
-        >
+        <Text color="secondary80 (Deprecated)" size="14px / 19px (Deprecated)" weight="medium">
           {children}
         </Text>
       </Stack>
@@ -164,7 +140,6 @@ function ActionButton({
 }
 
 function BuyButton() {
-  const { accountAddress } = useAccountProfile();
   const { navigate } = useNavigation();
   const { isDamaged } = useWallets();
 
@@ -179,7 +154,7 @@ function BuyButton() {
     });
 
     navigate(Routes.ADD_CASH_SHEET);
-  }, [accountAddress, isDamaged, navigate]);
+  }, [isDamaged, navigate]);
 
   return (
     <Box>
@@ -192,35 +167,23 @@ function BuyButton() {
 
 function SwapButton() {
   const { isReadOnlyWallet } = useWallets();
-
   const { navigate } = useNavigation();
 
-  const { updateInputCurrency } = useSwapCurrencyHandlers({
-    shouldUpdate: false,
-    type: ExchangeModalTypes.swap,
-  });
-
-  const handlePress = React.useCallback(() => {
+  const handlePress = React.useCallback(async () => {
     if (!isReadOnlyWallet || enableActionsOnReadOnlyWallet) {
       analytics.track('Tapped "Swap"', {
         category: 'home screen',
       });
-
-      android && delayNext();
-      navigate(Routes.EXCHANGE_MODAL, {
-        fromDiscover: true,
-        params: {
-          fromDiscover: true,
-          onSelectCurrency: updateInputCurrency,
-          title: lang.t('swap.modal_types.swap'),
-          type: CurrencySelectionTypes.input,
-        },
-        screen: Routes.CURRENCY_SELECT_SCREEN,
+      swapsStore.setState({
+        inputAsset: userAssetsStore.getState().getHighestValueNativeAsset(),
+      });
+      InteractionManager.runAfterInteractions(() => {
+        navigate(Routes.SWAP);
       });
     } else {
       watchingAlert();
     }
-  }, [isReadOnlyWallet, navigate, updateInputCurrency]);
+  }, [isReadOnlyWallet, navigate]);
 
   return (
     <ActionButton icon="􀖅" onPress={handlePress} testID="swap-button">
@@ -253,18 +216,17 @@ function SendButton() {
   );
 }
 
-function MoreButton() {
-  // ////////////////////////////////////////////////////
-  // Handlers
-
-  const [isToastActive, setToastActive] = useRecoilState(
-    addressCopiedToastAtom
-  );
+export function CopyButton() {
+  const [isToastActive, setToastActive] = useRecoilState(addressCopiedToastAtom);
   const { accountAddress } = useAccountProfile();
-  const { navigate } = useNavigation();
-  const { sessions: activeWCV2Sessions } = useWalletConnectV2Sessions();
+  const { isDamaged } = useWallets();
 
   const handlePressCopy = React.useCallback(() => {
+    if (isDamaged) {
+      showWalletErrorAlert();
+      return;
+    }
+
     if (!isToastActive) {
       setToastActive(true);
       setTimeout(() => {
@@ -272,72 +234,15 @@ function MoreButton() {
       }, 2000);
     }
     Clipboard.setString(accountAddress);
-  }, [accountAddress, isToastActive, setToastActive]);
-
-  const handlePressQRCode = React.useCallback(() => {
-    analyticsV2.track(analyticsV2.event.qrCodeViewed, {
-      component: 'ProfileActionButtonsRow',
-    });
-
-    navigate(Routes.RECEIVE_MODAL);
-  }, [navigate]);
-
-  const handlePressConnectedApps = React.useCallback(() => {
-    navigate(Routes.CONNECTED_DAPPS);
-  }, [navigate]);
-
-  // ////////////////////////////////////////////////////
-  // Context Menu
-
-  const { mostRecentWalletConnectors } = useWalletConnectConnections();
-
-  const menuConfig = {
-    menuItems: [
-      {
-        actionKey: 'copy',
-        actionTitle: lang.t('wallet.copy_address'),
-        icon: { iconType: 'SYSTEM', iconValue: 'doc.on.doc' },
-      },
-      {
-        actionKey: 'qrCode',
-        actionTitle: lang.t('button.my_qr_code'),
-        icon: { iconType: 'SYSTEM', iconValue: 'qrcode' },
-      },
-      mostRecentWalletConnectors.length > 0 || activeWCV2Sessions.length > 0
-        ? {
-            actionKey: 'connectedApps',
-            actionTitle: lang.t('wallet.connected_apps'),
-            icon: { iconType: 'SYSTEM', iconValue: 'app.badge.checkmark' },
-          }
-        : null,
-    ].filter(Boolean),
-    ...(ios ? { menuTitle: '' } : {}),
-  };
-
-  const handlePressMenuItem = React.useCallback(
-    // @ts-expect-error ContextMenu is an untyped JS component and can't type its onPress handler properly
-    e => {
-      if (e.nativeEvent.actionKey === 'copy') {
-        handlePressCopy();
-      }
-      if (e.nativeEvent.actionKey === 'qrCode') {
-        handlePressQRCode();
-      }
-      if (e.nativeEvent.actionKey === 'connectedApps') {
-        handlePressConnectedApps();
-      }
-    },
-    [handlePressConnectedApps, handlePressCopy, handlePressQRCode]
-  );
+  }, [accountAddress, isDamaged, isToastActive, setToastActive]);
 
   return (
-    <ContextMenuButton
-      menuConfig={menuConfig}
-      onPressMenuItem={handlePressMenuItem}
-    >
-      <ActionButton icon="􀍡" testID="more-button">
-        {lang.t('button.more')}
-      </ActionButton>
-    </ContextMenuButton>
+    <>
+      <CopyFloatingEmojis textToCopy={accountAddress}>
+        <ActionButton onPress={handlePressCopy} icon="􀐅" testID="receive-button">
+          {lang.t('wallet.copy')}
+        </ActionButton>
+      </CopyFloatingEmojis>
+    </>
   );
 }
