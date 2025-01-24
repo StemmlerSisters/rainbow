@@ -1,6 +1,7 @@
 import { LOG_LEVEL, LOG_DEBUG } from 'react-native-dotenv';
 import format from 'date-fns/format';
 import * as Sentry from '@sentry/react-native';
+import { SeverityLevel } from '@sentry/types';
 
 import * as env from '@/env';
 import { DebugContext } from '@/logger/debugContext';
@@ -14,13 +15,10 @@ export enum LogLevel {
   Log = 'log',
   Warn = 'warn',
   Error = 'error',
+  Fatal = 'fatal',
 }
 
-type Transport = (
-  level: LogLevel,
-  message: string | RainbowError,
-  metadata: Metadata
-) => void;
+type Transport = (level: LogLevel, message: string | RainbowError, metadata: Metadata) => void;
 
 /**
  * A union of some of Sentry's breadcrumb properties as well as Sentry's
@@ -32,17 +30,7 @@ type Metadata = {
    *
    * @see https://develop.sentry.dev/sdk/event-payloads/breadcrumbs/#breadcrumb-types
    */
-  type?:
-    | 'default'
-    | 'debug'
-    | 'error'
-    | 'navigation'
-    | 'http'
-    | 'info'
-    | 'query'
-    | 'transaction'
-    | 'ui'
-    | 'user';
+  type?: 'default' | 'debug' | 'error' | 'navigation' | 'http' | 'info' | 'query' | 'transaction' | 'ui' | 'user';
 
   /**
    * Passed through to `Sentry.captureException`
@@ -50,14 +38,7 @@ type Metadata = {
    * @see https://github.com/getsentry/sentry-javascript/blob/903addf9a1a1534a6cb2ba3143654b918a86f6dd/packages/types/src/misc.ts#L65
    */
   tags?: {
-    [key: string]:
-      | number
-      | string
-      | boolean
-      | bigint
-      | symbol
-      | null
-      | undefined;
+    [key: string]: number | string | boolean | bigint | symbol | null | undefined;
   };
 
   /**
@@ -70,17 +51,12 @@ type Metadata = {
 const enabledLogLevels: {
   [key in LogLevel]: LogLevel[];
 } = {
-  [LogLevel.Debug]: [
-    LogLevel.Debug,
-    LogLevel.Info,
-    LogLevel.Log,
-    LogLevel.Warn,
-    LogLevel.Error,
-  ],
+  [LogLevel.Debug]: [LogLevel.Debug, LogLevel.Info, LogLevel.Log, LogLevel.Warn, LogLevel.Error],
   [LogLevel.Info]: [LogLevel.Info, LogLevel.Log, LogLevel.Warn, LogLevel.Error],
   [LogLevel.Log]: [LogLevel.Log, LogLevel.Warn, LogLevel.Error],
   [LogLevel.Warn]: [LogLevel.Warn, LogLevel.Error],
   [LogLevel.Error]: [LogLevel.Error],
+  [LogLevel.Fatal]: [LogLevel.Fatal],
 };
 
 /**
@@ -106,11 +82,7 @@ function withColor([x, y]: [number, number]) {
   return function (txt: string) {
     if (txt == null) return txt;
     // eslint-disable-next-line no-extra-boolean-cast
-    return (
-      open +
-      (~('' + txt).indexOf(close) ? txt.replace(rgx, close + open) : txt) +
-      close
-    );
+    return open + (~('' + txt).indexOf(close) ? txt.replace(rgx, close + open) : txt) + close;
   };
 }
 
@@ -125,15 +97,14 @@ const LOG_PUSH_ENABLED = getExperimetalFlag(LOG_PUSH);
  */
 export const consoleTransport: Transport = (level, message, metadata) => {
   const timestamp = format(new Date(), 'HH:mm:ss');
-  const extra = Object.keys(metadata).length
-    ? ' ' + JSON.stringify(metadata, null, '  ')
-    : '';
+  const extra = Object.keys(metadata).length ? ' ' + JSON.stringify(metadata, null, '  ') : '';
   const color = {
     [LogLevel.Debug]: colors.magenta,
     [LogLevel.Info]: colors.default,
     [LogLevel.Log]: colors.default,
     [LogLevel.Warn]: colors.yellow,
     [LogLevel.Error]: colors.red,
+    [LogLevel.Fatal]: colors.red,
   }[level];
   // needed for stacktrace formatting
   const log = level === LogLevel.Error ? console.error : console.log;
@@ -147,30 +118,25 @@ export const consoleTransport: Transport = (level, message, metadata) => {
     });
   }
 
-  log(
-    `${timestamp} ${withColor(color)(
-      `[${level.toUpperCase()}]`
-    )} ${message.toString()}${extra}`
-  );
+  log(`${timestamp} ${withColor(color)(`[${level.toUpperCase()}]`)} ${message.toString()}${extra}`);
 };
 
-export const sentryTransport: Transport = (
-  level,
-  message,
-  { type, tags, ...metadata }
-) => {
+export const sentryTransport: Transport = (level: LogLevel, message, { type, tags, ...metadata }) => {
+  const severityMap: { [key in LogLevel]: SeverityLevel } = {
+    [LogLevel.Debug]: 'debug',
+    [LogLevel.Info]: 'info',
+    [LogLevel.Log]: 'log',
+    [LogLevel.Warn]: 'warning',
+    [LogLevel.Error]: 'error',
+    [LogLevel.Fatal]: 'fatal',
+  };
+
+  const severity = severityMap[level];
+
   /**
    * If a string, report a breadcrumb
    */
   if (typeof message === 'string') {
-    const severity = {
-      [LogLevel.Debug]: Sentry.Severity.Debug,
-      [LogLevel.Info]: Sentry.Severity.Info,
-      [LogLevel.Log]: Sentry.Severity.Log, // Sentry value here is undefined
-      [LogLevel.Warn]: Sentry.Severity.Warning,
-      [LogLevel.Error]: Sentry.Severity.Error,
-    }[level];
-
     Sentry.addBreadcrumb({
       message,
       data: metadata,
@@ -194,7 +160,7 @@ export const sentryTransport: Transport = (
      */
     if (level === LogLevel.Warn) {
       Sentry.captureMessage(message, {
-        level: Sentry.Severity.Warning,
+        level: severity,
         tags,
         extra: metadata,
       });
@@ -243,8 +209,7 @@ export class Logger {
   }
 
   debug(message: string, metadata: Metadata = {}, context?: string) {
-    if (context && !this.debugContextRegexes.find(reg => reg.test(context)))
-      return;
+    if (context && !this.debugContextRegexes.find(reg => reg.test(context))) return;
     this.transport(LogLevel.Debug, message, metadata);
   }
 
@@ -264,11 +229,7 @@ export class Logger {
     if (error instanceof RainbowError) {
       this.transport(LogLevel.Error, error, metadata);
     } else {
-      this.transport(
-        LogLevel.Error,
-        new RainbowError(`logger.error was not provided a RainbowError`),
-        metadata
-      );
+      this.transport(LogLevel.Error, new RainbowError(`logger.error was not provided a RainbowError`), metadata);
     }
   }
 
@@ -287,11 +248,7 @@ export class Logger {
     this.enabled = true;
   }
 
-  protected transport(
-    level: LogLevel,
-    message: string | RainbowError,
-    metadata: Metadata = {}
-  ) {
+  protected transport(level: LogLevel, message: string | RainbowError, metadata: Metadata = {}) {
     if (!this.enabled) return;
     if (!enabledLogLevels[this.level].includes(level)) return;
 
@@ -310,7 +267,7 @@ export class Logger {
  *   `logger.debug(message[, metadata, debugContext])`
  *   `logger.info(message[, metadata])`
  *   `logger.warn(message[, metadata])`
- *   `logger.error(error[, metadata])`
+ *   `logger.error(RainbowError[, metadata])`
  *   `logger.disable()`
  *   `logger.enable()`
  */

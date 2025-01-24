@@ -1,46 +1,26 @@
 import { PropsWithChildren, useCallback, useEffect, useRef } from 'react';
-import { usePrevious, useWallets } from '@/hooks';
+import { usePrevious, useSwitchWallet, useWallets } from '@/hooks';
 import { setupAndroidChannels } from '@/notifications/setupAndroidChannels';
-import messaging, {
-  FirebaseMessagingTypes,
-} from '@react-native-firebase/messaging';
+import messaging, { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import {
   FixedRemoteMessage,
+  MarketingNotificationData,
   MinimalNotification,
   NotificationTypes,
   TransactionNotificationData,
 } from '@/notifications/types';
 import { handleShowingForegroundNotification } from '@/notifications/foregroundHandler';
-import {
-  registerTokenRefreshListener,
-  saveFCMToken,
-} from '@/notifications/tokens';
-import { WALLETCONNECT_SYNC_DELAY } from '@/notifications/constants';
+import { registerTokenRefreshListener, saveFCMToken } from '@/notifications/tokens';
 import { useDispatch } from 'react-redux';
-import { requestsForTopic } from '@/redux/requests';
 import { ThunkDispatch } from 'redux-thunk';
 import store, { AppState } from '@/redux/store';
 import { AnyAction } from 'redux';
 import { NotificationStorage } from '@/notifications/deferredNotificationStorage';
 import { Navigation } from '@/navigation';
 import Routes from '@rainbow-me/routes';
-import {
-  AppState as ApplicationState,
-  AppStateStatus,
-  NativeEventSubscription,
-} from 'react-native';
-import notifee, {
-  Event as NotifeeEvent,
-  EventType,
-} from '@notifee/react-native';
-import { getProviderForNetwork } from '@/handlers/web3';
-import { ethereumUtils, isLowerCaseMatch } from '@/utils';
-import { NewTransactionOrAddCashTransaction } from '@/entities/transactions/transaction';
-import { TransactionDirection, TransactionStatus } from '@/entities';
-import { getTitle, getTransactionLabel, parseNewTransaction } from '@/parsers';
-import { isZero } from '@/helpers/utilities';
-import { getConfirmedState } from '@/helpers/transactions';
-import { mapNotificationTransactionType } from '@/notifications/mapTransactionsType';
+import { AppState as ApplicationState, AppStateStatus, NativeEventSubscription } from 'react-native';
+import notifee, { Event as NotifeeEvent, EventType } from '@notifee/react-native';
+import { isLowerCaseMatch } from '@/utils';
 import walletTypes from '@/helpers/walletTypes';
 import {
   NotificationSubscriptionChangesListener,
@@ -49,22 +29,20 @@ import {
   trackTappedPushNotification,
   trackWalletsSubscribedForNotifications,
 } from '@/notifications/analytics';
-import {
-  AddressWithRelationship,
-  NotificationRelationship,
-} from '@/notifications/settings';
-import { initializeNotificationSettingsForAllAddressesAndCleanupSettingsForRemovedWallets } from '@/notifications/settings/initialization';
+import { AddressWithRelationship, WalletNotificationRelationship } from '@/notifications/settings';
+import { initializeNotificationSettingsForAllAddresses } from '@/notifications/settings/initialization';
 import { logger } from '@/logger';
-import { setHasPendingDeeplinkPendingRedirect } from '@/walletConnect';
+import { transactionFetchQuery } from '@/resources/transactions/transaction';
 
 type Callback = () => void;
 
 type Props = PropsWithChildren<{ walletReady: boolean }>;
 
 export const NotificationsHandler = ({ walletReady }: Props) => {
-  const wallets = useWallets();
+  const { wallets } = useWallets();
+  const walletSwitcher = useSwitchWallet();
   const dispatch: ThunkDispatch<AppState, unknown, AnyAction> = useDispatch();
-  const walletsRef = useRef(wallets);
+  const walletSwitcherRef = useRef(walletSwitcher);
   const prevWalletReady = usePrevious(walletReady);
   const subscriptionChangesListener = useRef<NotificationSubscriptionChangesListener>();
   const onTokenRefreshListener = useRef<Callback>();
@@ -79,40 +57,13 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
   We need to save wallets property to a ref in order to have an up-to-date value
   inside the event listener callbacks closure
    */
-  walletsRef.current = wallets;
+  walletSwitcherRef.current = walletSwitcher;
 
-  const onForegroundRemoteNotification = (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ) => {
+  const onForegroundRemoteNotification = (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
     const type = remoteMessage?.data?.type;
-    if (type === NotificationTypes.walletConnect) {
-      handleWalletConnectNotification(remoteMessage);
-    } else if (remoteMessage?.notification !== undefined) {
+    if (type !== NotificationTypes.walletConnect && remoteMessage?.notification !== undefined) {
       handleShowingForegroundNotification(remoteMessage as FixedRemoteMessage);
     }
-  };
-
-  const onBackgroundRemoteNotification = async (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ) => {
-    const type = remoteMessage?.data?.type;
-    if (type === NotificationTypes.walletConnect) {
-      handleWalletConnectNotification(remoteMessage);
-    }
-  };
-
-  const handleWalletConnectNotification = (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ) => {
-    const topic = remoteMessage?.data?.topic;
-
-    setTimeout(() => {
-      const requests = dispatch(requestsForTopic(topic));
-      if (requests) {
-        // WC requests will open automatically
-        return false;
-      }
-    }, WALLETCONNECT_SYNC_DELAY);
   };
 
   const handleDeferredNotificationIfNeeded = useCallback(async () => {
@@ -124,9 +75,7 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
     }
   }, []);
 
-  const handleAppOpenedWithNotification = (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage | null
-  ) => {
+  const handleAppOpenedWithNotification = (remoteMessage: FirebaseMessagingTypes.RemoteMessage | null) => {
     if (!remoteMessage) {
       return;
     }
@@ -140,7 +89,15 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
 
   const handleNotificationPressed = (event: NotifeeEvent) => {
     if (event.type === EventType.PRESS) {
-      handleOpenedNotification(event.detail.notification);
+      const notification = event.detail.notification;
+      if (notification) {
+        const minimalNotification: MinimalNotification = {
+          title: notification.title,
+          body: notification.body,
+          data: notification.data as { [key: string]: string | object },
+        };
+        handleOpenedNotification(minimalNotification);
+      }
     }
   };
 
@@ -158,150 +115,61 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
     performActionBasedOnOpenedNotificationType(notification);
   };
 
-  const performActionBasedOnOpenedNotificationType = async (
-    notification: MinimalNotification
-  ) => {
+  const performActionBasedOnOpenedNotificationType = async (notification: MinimalNotification) => {
     const type = notification?.data?.type;
 
     if (type === NotificationTypes.transaction) {
       const untypedData = notification?.data;
-      if (
-        !untypedData?.address ||
-        !untypedData?.hash ||
-        !untypedData?.chain ||
-        !untypedData?.transaction_type
-      ) {
+      if (!untypedData?.address || !untypedData?.hash || !untypedData?.chain || !untypedData?.transaction_type) {
         return;
       }
 
       // casting data payload to type that was agreed on with backend
-      const data = (notification.data as unknown) as TransactionNotificationData;
+      const data = notification.data as unknown as TransactionNotificationData;
 
-      const wallets = walletsRef.current;
+      const walletSwitcher = walletSwitcherRef.current;
       const { accountAddress, nativeCurrency } = store.getState().settings;
 
       let walletAddress: string | null | undefined = accountAddress;
       if (!isLowerCaseMatch(accountAddress, data.address)) {
-        walletAddress = await wallets.switchToWalletWithAddress(data.address);
+        walletAddress = await walletSwitcher.switchToWalletWithAddress(data.address);
       }
       if (!walletAddress) {
         return;
       }
       Navigation.handleAction(Routes.PROFILE_SCREEN, {});
-      const zerionTransaction = store
-        .getState()
-        .data.transactions.find(tx =>
-          isLowerCaseMatch(ethereumUtils.getHash(tx) ?? '', data.hash)
-        );
-      if (zerionTransaction) {
-        Navigation.handleAction(Routes.TRANSACTION_DETAILS, {
-          transaction: zerionTransaction,
-        });
-      } else {
-        const network = ethereumUtils.getNetworkFromChainId(
-          parseInt(data.chain, 10)
-        );
-        const provider = await getProviderForNetwork(network);
-        const rpcTransaction = await provider.getTransaction(data.hash);
 
-        const transactionConfirmed =
-          rpcTransaction?.blockNumber && rpcTransaction?.blockHash;
-        if (!transactionConfirmed) {
-          return;
-        }
+      const chainId = parseInt(data.chain, 10);
 
-        const newTransactionDetails: NewTransactionOrAddCashTransaction = {
-          type: mapNotificationTransactionType(data.transaction_type),
-          network,
-          hash: rpcTransaction.hash,
-          status: TransactionStatus.unknown,
-          amount: rpcTransaction.value.toString(),
-          nonce: rpcTransaction.nonce,
-          from: rpcTransaction.from,
-          to: rpcTransaction.to ?? null,
-          asset: null,
-          gasLimit: rpcTransaction.gasLimit,
-          maxFeePerGas: rpcTransaction.maxFeePerGas,
-          maxPriorityFeePerGas: rpcTransaction.maxPriorityFeePerGas,
-          gasPrice: rpcTransaction.gasPrice,
-          data: rpcTransaction.data,
-        };
+      const transaction = await transactionFetchQuery({
+        hash: data.hash,
+        chainId,
+        address: walletAddress,
+        currency: nativeCurrency,
+      });
 
-        const parsedTransaction = await parseNewTransaction(
-          newTransactionDetails,
-          nativeCurrency
-        );
-        const resultTransaction = { ...parsedTransaction };
-        const minedAt = Math.floor(Date.now() / 1000);
-        let receipt;
-
-        try {
-          if (rpcTransaction) {
-            receipt = await rpcTransaction.wait();
-          }
-        } catch (e: any) {
-          // https://docs.ethers.io/v5/api/providers/types/#providers-TransactionResponse
-          if (e.transaction) {
-            // if a transaction field exists, it was confirmed but failed
-            resultTransaction.status = TransactionStatus.failed;
-          } else {
-            // cancelled or replaced
-            resultTransaction.status = TransactionStatus.cancelled;
-          }
-        }
-        const status = receipt?.status || 0;
-        if (!isZero(status)) {
-          let direction = TransactionDirection.out;
-          if (
-            parsedTransaction?.from &&
-            parsedTransaction?.to &&
-            isLowerCaseMatch(parsedTransaction.from, parsedTransaction.to)
-          ) {
-            direction = TransactionDirection.self;
-          }
-          if (
-            parsedTransaction?.from &&
-            parsedTransaction?.to &&
-            isLowerCaseMatch(walletAddress, parsedTransaction.to)
-          ) {
-            direction = TransactionDirection.in;
-          }
-
-          const newStatus = getTransactionLabel({
-            direction,
-            pending: false,
-            protocol: parsedTransaction?.protocol,
-            status:
-              parsedTransaction.status === TransactionStatus.cancelling
-                ? TransactionStatus.cancelled
-                : getConfirmedState(parsedTransaction.type),
-            type: parsedTransaction?.type,
-          });
-          resultTransaction.status = newStatus;
-        } else {
-          resultTransaction.status = TransactionStatus.failed;
-        }
-        resultTransaction.title = getTitle({
-          protocol: parsedTransaction.protocol,
-          status: resultTransaction.status,
-          type: parsedTransaction.type,
-        });
-        resultTransaction.pending = false;
-        resultTransaction.minedAt = minedAt;
-
-        if (resultTransaction) {
-          Navigation.handleAction(Routes.TRANSACTION_DETAILS, {
-            transaction: resultTransaction,
-          });
-        }
+      if (!transaction) {
+        return;
       }
+
+      Navigation.handleAction(Routes.TRANSACTION_DETAILS, {
+        transaction,
+      });
     } else if (type === NotificationTypes.walletConnect) {
-      logger.info(
-        `NotificationsHandler: handling wallet connect notification`,
-        { notification }
-      );
+      logger.debug(`[NotificationsHandler]: handling wallet connect notification`, { notification });
+    } else if (type === NotificationTypes.marketing) {
+      logger.debug(`[NotificationsHandler]: handling marketing notification`, {
+        notification,
+      });
+      const data = notification.data as unknown as MarketingNotificationData;
+      if (data?.route) {
+        const parsedProps = JSON.parse(data?.routeProps || '{}');
+        Navigation.handleAction((Routes as any)[data.route], {
+          ...(parsedProps || {}),
+        });
+      }
     } else {
-      logger.warn(`NotificationsHandler: received unknown notification`, {
+      logger.warn(`[NotificationsHandler]: received unknown notification`, {
         notification,
       });
     }
@@ -313,25 +181,15 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
     trackWalletsSubscribedForNotifications();
     subscriptionChangesListener.current = registerNotificationSubscriptionChangesListener();
     onTokenRefreshListener.current = registerTokenRefreshListener();
-    foregroundNotificationListener.current = messaging().onMessage(
-      onForegroundRemoteNotification
-    );
-    messaging().setBackgroundMessageHandler(onBackgroundRemoteNotification);
+    foregroundNotificationListener.current = messaging().onMessage(onForegroundRemoteNotification);
     messaging().getInitialNotification().then(handleAppOpenedWithNotification);
-    notificationOpenedListener.current = messaging().onNotificationOpenedApp(
-      handleAppOpenedWithNotification
-    );
-    appStateListener.current = ApplicationState.addEventListener(
-      'change',
-      nextAppState => {
-        if (appState.current === 'background' && nextAppState === 'active') {
-          handleDeferredNotificationIfNeeded();
-        }
+    notificationOpenedListener.current = messaging().onNotificationOpenedApp(handleAppOpenedWithNotification);
+    appStateListener.current = ApplicationState.addEventListener('change', nextAppState => {
+      if (appState.current === 'background' && nextAppState === 'active') {
+        handleDeferredNotificationIfNeeded();
       }
-    );
-    notifeeForegroundEventListener.current = notifee.onForegroundEvent(
-      handleNotificationPressed
-    );
+    });
+    notifeeForegroundEventListener.current = notifee.onForegroundEvent(handleNotificationPressed);
 
     resolveAndTrackPushNotificationPermissionStatus();
 
@@ -359,23 +217,19 @@ export const NotificationsHandler = ({ walletReady }: Props) => {
     if (walletReady && !alreadyRanInitialization.current) {
       const addresses: AddressWithRelationship[] = [];
 
-      Object.values(wallets.wallets ?? {}).forEach(wallet =>
+      Object.values(wallets ?? {}).forEach(wallet =>
         wallet?.addresses.forEach(
           ({ address, visible }: { address: string; visible: boolean }) =>
             visible &&
             addresses.push({
               address,
               relationship:
-                wallet.type === walletTypes.readOnly
-                  ? NotificationRelationship.WATCHER
-                  : NotificationRelationship.OWNER,
+                wallet.type === walletTypes.readOnly ? WalletNotificationRelationship.WATCHER : WalletNotificationRelationship.OWNER,
             })
         )
       );
+      initializeNotificationSettingsForAllAddresses(addresses);
 
-      initializeNotificationSettingsForAllAddressesAndCleanupSettingsForRemovedWallets(
-        addresses
-      );
       alreadyRanInitialization.current = true;
     }
   }, [dispatch, walletReady]);

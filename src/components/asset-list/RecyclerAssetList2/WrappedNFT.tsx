@@ -1,14 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
-import {
-  // @ts-ignore
-  IS_TESTING,
-} from 'react-native-dotenv';
 import { UniqueTokenCard } from '../../unique-token';
 import { Box, BoxProps } from '@/design-system';
 import { UniqueAsset } from '@/entities';
 import { useCollectible } from '@/hooks';
 import { useNavigation } from '@/navigation';
 import Routes from '@/navigation/routesNames';
+import { useRemoteConfig } from '@/model/remoteConfig';
+import { NFTS_ENABLED, useExperimentalFlag } from '@/config';
 
 export default React.memo(function WrappedNFT({
   onPress,
@@ -21,14 +19,14 @@ export default React.memo(function WrappedNFT({
   placement: 'left' | 'right';
   externalAddress?: string;
 }) {
-  const assetCollectible = useCollectible({ uniqueId }, externalAddress);
+  const { nfts_enabled } = useRemoteConfig();
+  const nftsEnabled = useExperimentalFlag(NFTS_ENABLED) || nfts_enabled;
+
+  const assetCollectible = useCollectible(uniqueId, externalAddress);
 
   const asset = useMemo(
     () => ({
       ...assetCollectible,
-      ...(IS_TESTING === 'true'
-        ? { image_original_url: null, image_preview_url: null, image_url: null }
-        : {}),
     }),
     [assetCollectible]
   );
@@ -61,13 +59,11 @@ export default React.memo(function WrappedNFT({
           alignItems: 'flex-end',
           paddingRight: '19px (Deprecated)',
         };
+
+  if (!nftsEnabled) return null;
+
   return (
-    <Box
-      flexGrow={1}
-      justifyContent="center"
-      testID={`wrapped-nft-${asset.name}`}
-      {...placementProps}
-    >
+    <Box flexGrow={1} justifyContent="center" testID={`wrapped-nft-${asset.name}`} {...placementProps}>
       <UniqueTokenCard item={asset} onPress={onPress || handleItemPress} />
     </Box>
   );

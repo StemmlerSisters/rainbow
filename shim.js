@@ -1,14 +1,14 @@
 import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
 import '@ethersproject/shims';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNative from 'react-native';
-import Animated from 'react-native-reanimated';
 import Storage from 'react-native-storage';
 // import { debugLayoutAnimations } from './src/config/debug';
 import { mmkvStorageBackend } from '@/handlers/localstorage/mmkvStorageBackend';
-import toLocaleStringPolyfill from '@/helpers/toLocaleStringPolyfill';
-import logger from '@/utils/logger';
+import { logger } from '@/logger';
 import 'fast-text-encoding';
+import globalVariables from './globalVariables';
 
 if (typeof BigInt === 'undefined') global.BigInt = require('big-integer');
 
@@ -24,60 +24,30 @@ if (typeof atob === 'undefined') {
   };
 }
 
-toLocaleStringPolyfill();
-
 // https://github.com/facebook/react-native/commit/1049835b504cece42ee43ac5b554687891da1349
 // https://github.com/facebook/react-native/commit/035718ba97bb44c68f2a4ccdd95e537e3d28690
 if (ReactNative.Keyboard.removeEventListener) {
-  ReactNative.Keyboard.removeListener =
-    ReactNative.Keyboard.removeEventListener;
+  ReactNative.Keyboard.removeListener = ReactNative.Keyboard.removeEventListener;
 }
-
-ReactNative.Platform.OS === 'ios' &&
-  Animated.addWhitelistedNativeProps({ d: true });
 
 const storage = new Storage({
   defaultExpires: null,
   size: 10000,
   // TODO (RNBW-3969): Migrate to mmkv on iOS too
-  storageBackend:
-    ReactNative.Platform.OS === 'ios' ? AsyncStorage : mmkvStorageBackend,
+  storageBackend: ReactNative.Platform.OS === 'ios' ? AsyncStorage : mmkvStorageBackend,
 });
 
 if (ReactNative.Platform.OS === 'android') {
   ReactNative.UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
 
-if (
-  !global.__reanimatedModuleProxy &&
-  !ReactNative.TurboModuleRegistry.get('NativeReanimated')
-) {
-  global.__reanimatedModuleProxy = {
-    __shimmed: true,
-    installCoreFunctions() {},
-    makeMutable(init) {
-      return { value: init };
-    },
-    makeRemote() {},
-    makeShareable() {
-      return () => {};
-    },
-    registerEventHandler() {},
-    startMapper() {},
-    stopMapper() {},
-    unregisterEventHandler() {},
-  };
-}
-
 global.storage = storage;
 
-// shimming for reanimated need to happen before importing globalVariables.js
-// eslint-disable-next-line import/no-commonjs
-for (let variable of Object.entries(require('./globalVariables').default)) {
-  Object.defineProperty(global, variable[0], {
-    get: () => variable[1],
+for (const [key, value] of Object.entries(globalVariables)) {
+  Object.defineProperty(global, key, {
+    get: () => value,
     set: () => {
-      logger.sentry(`Trying to override internal Rainbow var ${variable[0]}`);
+      logger.debug(`[shim]: Trying to override internal Rainbow var ${key}`);
     },
   });
 }
@@ -88,10 +58,7 @@ if (SHORTEN_PROP_TYPES_ERROR) {
   const oldConsoleError = console.error; // eslint-disable-line no-console
   // eslint-disable-next-line no-console
   console.error = function () {
-    if (
-      typeof arguments[0] === 'string' &&
-      arguments[0].startsWith('Warning: Failed prop type')
-    ) {
+    if (typeof arguments[0] === 'string' && arguments[0].startsWith('Warning: Failed prop type')) {
       // eslint-disable-next-line no-console
       console.log(
         `PropTypes error in: ${arguments[0]
@@ -101,12 +68,7 @@ if (SHORTEN_PROP_TYPES_ERROR) {
       );
       return;
     }
-    if (
-      typeof arguments[0] === 'string' &&
-      arguments[0].startsWith(
-        'VirtualizedLists should never be nested inside plain ScrollViews'
-      )
-    ) {
+    if (typeof arguments[0] === 'string' && arguments[0].startsWith('VirtualizedLists should never be nested inside plain ScrollViews')) {
       return;
     }
     oldConsoleError?.apply(this, arguments);
@@ -118,7 +80,7 @@ if (typeof process === 'undefined') {
   global.process = require('process');
 } else {
   const bProcess = require('process');
-  for (var p in bProcess) {
+  for (const p in bProcess) {
     if (!(p in process)) {
       process[p] = bProcess[p];
     }
@@ -146,24 +108,21 @@ ReactNative.LayoutAnimation.configureNext = () => null;
 //   debugLayoutAnimations
 // ) {
 //   ReactNative.LayoutAnimation.configureNext = (...args) => {
-//     logger.sentry('LayoutAnimation.configureNext', args);
+//     logger.debug('[shim]: LayoutAnimation.configureNext', args);
 //     oldConfigureNext(...args);
 //   };
 //   ReactNative.LayoutAnimation.configureNext.__shimmed = true;
 // }
 
 if (!ReactNative.InteractionManager._shimmed) {
-  const oldCreateInteractionHandle =
-    ReactNative.InteractionManager.createInteractionHandle;
+  const oldCreateInteractionHandle = ReactNative.InteractionManager.createInteractionHandle;
 
-  ReactNative.InteractionManager.createInteractionHandle = function (
-    finishAutomatically = true
-  ) {
+  ReactNative.InteractionManager.createInteractionHandle = function (finishAutomatically = true) {
     const handle = oldCreateInteractionHandle();
     if (finishAutomatically) {
       setTimeout(() => {
         ReactNative.InteractionManager.clearInteractionHandle(handle);
-        logger.sentry(`Interaction finished automatically`);
+        logger.debug(`[shim]: Interaction finished automatically`);
       }, 3000);
     }
     return handle;
@@ -177,10 +136,7 @@ if (!ReactNative.InteractionManager._shimmed) {
 // eslint-disable-next-line import/no-commonjs
 require('crypto');
 
-const description = Object.getOwnPropertyDescriptor(
-  ReactNative,
-  'requireNativeComponent'
-);
+const description = Object.getOwnPropertyDescriptor(ReactNative, 'requireNativeComponent');
 
 if (!description.writable) {
   Object.defineProperty(ReactNative, 'requireNativeComponent', {

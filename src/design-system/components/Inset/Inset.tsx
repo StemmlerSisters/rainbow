@@ -12,21 +12,13 @@ export type InsetProps = {
   bottom?: Space;
   left?: Space;
   right?: Space;
+  testId?: string;
 };
 
 /**
  * @description Renders a container with padding.
  */
-export function Inset({
-  space: spaceProp,
-  horizontal,
-  vertical,
-  top,
-  bottom,
-  left,
-  right,
-  children,
-}: InsetProps) {
+export function Inset({ space: spaceProp, horizontal, vertical, top, bottom, left, right, children, testId }: InsetProps) {
   const margin = resolveToken(space, spaceProp);
   const marginBottom = resolveToken(space, bottom);
   const marginHorizontal = resolveToken(space, horizontal);
@@ -45,16 +37,12 @@ export function Inset({
       marginTop,
       marginVertical,
     }),
-    [
-      margin,
-      marginBottom,
-      marginHorizontal,
-      marginLeft,
-      marginRight,
-      marginTop,
-      marginVertical,
-    ]
+    [margin, marginBottom, marginHorizontal, marginLeft, marginRight, marginTop, marginVertical]
   );
 
-  return <Box style={style}>{children}</Box>;
+  return (
+    <Box style={style} testID={testId}>
+      {children}
+    </Box>
+  );
 }

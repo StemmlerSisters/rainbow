@@ -12,15 +12,14 @@ import { useDimensions } from '@/hooks';
 import { fonts, fontWithWidth, position } from '@/styles';
 import { useTheme } from '@/theme';
 import { formatURLForDisplay } from '@/utils';
+import { IS_ANDROID } from '@/env';
 
-export const ExternalLinkWarningSheetHeight = 380 + (android ? 20 : 0);
+export const ExternalLinkWarningSheetHeight = 380 + (IS_ANDROID ? 20 : 0);
 
-const Container = styled(Centered).attrs({ direction: 'column' })(
-  ({ deviceHeight, height }) => ({
-    ...position.coverAsObject,
-    ...(height ? { height: height + deviceHeight } : {}),
-  })
-);
+const Container = styled(Centered).attrs({ direction: 'column' })(({ deviceHeight, height }) => ({
+  ...position.coverAsObject,
+  ...(height ? { height: height + deviceHeight } : {}),
+}));
 
 const ExternalLinkWarningSheet = () => {
   const { height: deviceHeight } = useDimensions();
@@ -42,22 +41,9 @@ const ExternalLinkWarningSheet = () => {
   }, [onClose, goBack, url]);
 
   return (
-    <Container
-      deviceHeight={deviceHeight}
-      height={ExternalLinkWarningSheetHeight}
-      insets={insets}
-    >
-      {/* @ts-expect-error JavaScript component */}
-      <SlackSheet
-        additionalTopPadding={android}
-        contentHeight={ExternalLinkWarningSheetHeight}
-        scrollEnabled={false}
-      >
-        <Centered
-          direction="column"
-          height={ExternalLinkWarningSheetHeight}
-          width="100%"
-        >
+    <Container deviceHeight={deviceHeight} height={ExternalLinkWarningSheetHeight} insets={insets}>
+      <SlackSheet additionalTopPadding={IS_ANDROID} contentHeight={ExternalLinkWarningSheetHeight} scrollEnabled={false}>
+        <Centered direction="column" height={ExternalLinkWarningSheetHeight} width="100%">
           <ColumnWithMargins
             margin={15}
             style={{
@@ -66,12 +52,7 @@ const ExternalLinkWarningSheet = () => {
               width: '100%',
             }}
           >
-            <Emoji
-              align="center"
-              size="h1"
-              style={{ ...fontWithWidth(fonts.weight.bold) }}
-              // @ts-expect-error JavaScript component
-            >
+            <Emoji align="center" size="h1" style={{ ...fontWithWidth(fonts.weight.bold) }}>
               🧭
             </Emoji>
             <SheetTitle
@@ -97,9 +78,7 @@ const ExternalLinkWarningSheet = () => {
                 paddingHorizontal: 23,
               }}
             >
-              {lang.t(
-                'modal.external_link_warning.you_are_attempting_to_visit'
-              )}
+              {lang.t('modal.external_link_warning.you_are_attempting_to_visit')}
             </Text>
 
             <Column height={60}>

@@ -1,14 +1,14 @@
 import React, { createElement } from 'react';
-import { CoinIcon, CoinIconGroup, CoinIconSize } from '../coin-icon';
 import { Column, Row } from '../layout';
 import { useAccountSettings } from '@/hooks';
 import styled from '@/styled-thing';
 import { padding } from '@/styles';
+import RainbowCoinIcon from '../coin-icon/RainbowCoinIcon';
 
+const CoinIconSize = 40;
 const CoinRowPaddingTop = 9;
 const CoinRowPaddingBottom = 10;
-export const CoinRowHeight =
-  CoinIconSize + CoinRowPaddingTop + CoinRowPaddingBottom;
+export const CoinRowHeight = CoinIconSize + CoinRowPaddingTop + CoinRowPaddingBottom;
 
 const Container = styled(Row).attrs({
   align: 'center',
@@ -28,11 +28,11 @@ const Content = styled(Column).attrs({ justify: 'space-between' })({
 
 export default function CoinRow({
   address,
-  badgeXPosition,
-  badgeYPosition,
+  badgeXPosition = -10,
+  badgeYPosition = 0,
   bottomRowRender,
   children,
-  coinIconRender = CoinIcon,
+  coinIconRender = RainbowCoinIcon,
   containerStyles,
   contentStyles,
   isFirstCoinRow,
@@ -44,32 +44,27 @@ export default function CoinRow({
   testID,
   topRowRender,
   tokens,
-  type,
+  network,
   ...props
 }) {
   const { nativeCurrency, nativeCurrencySymbol } = useAccountSettings();
   return (
     <Container style={containerStyles}>
-      {isPool ? (
-        <CoinIconGroup tokens={tokens} />
-      ) : (
-        createElement(coinIconRender, {
-          address,
-          badgeXPosition,
-          badgeYPosition,
-          isFirstCoinRow,
-          isHidden,
-          isPinned,
-          symbol,
-          type,
-          ...props,
-        })
-      )}
+      {createElement(coinIconRender, {
+        address,
+        chainBadgePosition: {
+          x: badgeXPosition,
+          y: badgeYPosition,
+        },
+        isFirstCoinRow,
+        isHidden,
+        isPinned,
+        symbol,
+        network,
+        ...props,
+      })}
       <Content isHidden={isHidden} justify="center" style={contentStyles}>
-        <Row
-          align="center"
-          testID={`${testID}-${symbol || ''}-${type || 'token'}`}
-        >
+        <Row align="center" testID={`${testID}-${symbol || ''}-${network}`}>
           {topRowRender({
             name,
             nativeCurrency,
@@ -87,9 +82,7 @@ export default function CoinRow({
           })}
         </Row>
       </Content>
-      {typeof children === 'function'
-        ? children({ symbol, ...props })
-        : children}
+      {typeof children === 'function' ? children({ symbol, ...props }) : children}
     </Container>
   );
 }

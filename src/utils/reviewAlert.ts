@@ -1,56 +1,94 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import lang from 'i18n-js';
-import { Linking, NativeModules } from 'react-native';
+import * as ls from '@/storage';
 import { WrappedAlert as Alert } from '@/helpers/alert';
-const { RainbowRequestReview } = NativeModules;
+import { ReviewPromptAction } from '@/storage/schema';
+import { logger, RainbowError } from '@/logger';
+import * as StoreReview from 'expo-store-review';
+import { IS_TEST } from '@/env';
 
-export const AppleReviewAddress =
-  'itms-apps://itunes.apple.com/us/app/appName/id1457119021?mt=8&action=write-review';
+export const AppleReviewAddress = 'itms-apps://itunes.apple.com/us/app/appName/id1457119021?mt=8&action=write-review';
 
-export const REVIEW_DONE_KEY = 'AppStoreReviewDone';
-export const REVIEW_ASKED_KEY = 'AppStoreReviewAsked';
-let reviewDisplayedInTheSession = false;
-const TWO_MONTHS = 2 * 30 * 24 * 60 * 60 * 1000;
+const TWO_MONTHS = 1000 * 60 * 60 * 24 * 60;
 
-export default async function maybeReviewAlert() {
-  const reviewAsked = await AsyncStorage.getItem(REVIEW_ASKED_KEY);
-  if (Number(reviewAsked) > Date.now() - TWO_MONTHS) {
+export const numberOfTimesBeforePrompt: {
+  [key in ReviewPromptAction]: number;
+} = {
+  UserPrompt: 0, // this should never increment
+  TimesLaunchedSinceInstall: 5,
+  SuccessfulFiatToCryptoPurchase: 1,
+  DappConnections: 2,
+  Swap: 2,
+  BridgeToL2: 1,
+  AddingContact: 1,
+  EnsNameSearch: 1,
+  EnsNameRegistration: 1,
+  WatchWallet: 2,
+  NftFloorPriceVisit: 3,
+};
+
+export const handleReviewPromptAction = async (action: ReviewPromptAction) => {
+  logger.debug(`[reviewAlert]: handleReviewPromptAction: ${action}`);
+
+  if (IS_TEST) {
     return;
   }
 
-  const reviewDone = await AsyncStorage.getItem(REVIEW_DONE_KEY);
-  if (reviewDone) {
+  if (action === ReviewPromptAction.UserPrompt) {
+    promptForReview();
     return;
   }
-  // update to prevent double showing alert in one session
-  if (reviewDisplayedInTheSession) {
+
+  const hasReviewed = ls.review.get(['hasReviewed']);
+  if (hasReviewed) {
     return;
   }
-  reviewDisplayedInTheSession = true;
 
-  AsyncStorage.setItem(REVIEW_ASKED_KEY, Date.now().toString());
+  const actions = ls.review.get(['actions']) || [];
+  const actionToDispatch = actions.find(a => a.id === action);
+  if (!actionToDispatch) {
+    return;
+  }
 
-  Alert.alert(
-    lang.t('review.alert.are_you_enjoying_rainbow'),
-    lang.t('review.alert.leave_a_review'),
-    [
-      {
-        onPress: () => {
-          AsyncStorage.setItem(REVIEW_DONE_KEY, 'true');
-          if (reviewDisplayedInTheSession) {
-            return;
-          }
-          RainbowRequestReview?.requestReview((handled: any) => {
-            if (!handled) {
-              Linking.openURL(AppleReviewAddress);
-            }
+  const timeOfLastPrompt = ls.review.get(['timeOfLastPrompt']) || 0;
+  logger.debug(`[reviewAlert]: timeOfLastPrompt: ${timeOfLastPrompt}`);
+
+  actionToDispatch.numOfTimesDispatched += 1;
+  logger.debug(`[reviewAlert]: numOfTimesDispatched: ${actionToDispatch.numOfTimesDispatched}`);
+
+  const hasReachedAmount = actionToDispatch.numOfTimesDispatched >= numberOfTimesBeforePrompt[action];
+
+  if (hasReachedAmount) {
+    // set the numOfTimesDispatched to MAX
+    actionToDispatch.numOfTimesDispatched = numberOfTimesBeforePrompt[action];
+  }
+
+  if (hasReachedAmount && timeOfLastPrompt + TWO_MONTHS <= Date.now()) {
+    logger.debug(`[reviewAlert]: Prompting for review`);
+    actionToDispatch.numOfTimesDispatched = 0;
+    ls.review.set(['timeOfLastPrompt'], Date.now());
+    promptForReview();
+  }
+
+  ls.review.set(['actions'], actions);
+};
+
+export const promptForReview = async () => {
+  Alert.alert(lang.t('review.alert.are_you_enjoying_rainbow'), lang.t('review.alert.leave_a_review'), [
+    {
+      onPress: async () => {
+        try {
+          ls.review.set(['hasReviewed'], true);
+          await StoreReview.requestReview();
+        } catch (e) {
+          logger.error(new RainbowError('[reviewAlert]: Failed to request review'), {
+            error: e,
           });
-        },
-        text: lang.t('review.alert.yes'),
+        }
       },
-      {
-        text: lang.t('review.alert.no'),
-      },
-    ]
-  );
-}
+      text: lang.t('review.alert.yes'),
+    },
+    {
+      text: lang.t('review.alert.no'),
+    },
+  ]);
+};

@@ -1,18 +1,13 @@
 import lang from 'i18n-js';
 import { chunk, compact, groupBy, isEmpty, slice, sortBy } from 'lodash';
-import { add, convertAmountToNativeDisplay, greaterThan } from './utilities';
+import { add, greaterThan } from './utilities';
 import { AssetListType } from '@/components/asset-list/RecyclerAssetList2';
-import store from '@/redux/store';
-import {
-  ETH_ADDRESS,
-  ETH_ICON_URL,
-  supportedNativeCurrencies,
-} from '@/references';
-import {
-  ethereumUtils,
-  getUniqueTokenFormat,
-  getUniqueTokenType,
-} from '@/utils';
+import { supportedNativeCurrencies } from '@/references';
+import { getUniqueTokenFormat, getUniqueTokenType } from '@/utils';
+import * as i18n from '@/languages';
+import { UniqueAsset } from '@/entities';
+import { NftCollectionSortCriterion } from '@/graphql/__generated__/arc';
+import { UniqueId } from '@/__swaps__/types/assets';
 
 const COINS_TO_SHOW = 5;
 
@@ -36,7 +31,7 @@ export const buildCoinsList = (
   nativeCurrency: any,
   isCoinListEdited: any,
   pinnedCoins: any,
-  hiddenCoins: any
+  hiddenCoins: Set<UniqueId>
 ) => {
   if (!sortedAssets.length) {
     return {
@@ -46,14 +41,14 @@ export const buildCoinsList = (
     };
   }
 
-  let standardAssets: any = [],
+  const standardAssets: any = [],
     pinnedAssets: any = [],
     smallAssets: any = [],
     hiddenAssets: any = [];
 
   // separate into standard, pinned, small balances, hidden assets
   sortedAssets?.forEach((asset: any) => {
-    if (!!hiddenCoins && hiddenCoins[asset.uniqueId]) {
+    if (hiddenCoins.has(asset.uniqueId)) {
       hiddenAssets.push({
         isCoin: true,
         isHidden: true,
@@ -134,18 +129,18 @@ export const buildBriefCoinsList = (
   nativeCurrency: any,
   isCoinListEdited: any,
   pinnedCoins: any,
-  hiddenCoins: any
+  hiddenAssets: Set<UniqueId>
 ) => {
   const { assets, smallBalancesValue, totalBalancesValue } = buildCoinsList(
     sortedAssets,
     nativeCurrency,
     isCoinListEdited,
     pinnedCoins,
-    hiddenCoins
+    hiddenAssets
   );
   const briefAssets = [];
   if (assets) {
-    for (let asset of assets) {
+    for (const asset of assets) {
       if (asset.coinDivider) {
         briefAssets.push({
           defaultToEditButton: asset.defaultToEditButton,
@@ -154,7 +149,7 @@ export const buildBriefCoinsList = (
           value: smallBalancesValue,
         });
       } else if (asset.smallBalancesContainer) {
-        for (let smallAsset of asset.assets) {
+        for (const smallAsset of asset.assets) {
           briefAssets.push({
             type: 'COIN',
             uid: 'coin-' + smallAsset.uniqueId,
@@ -174,10 +169,7 @@ export const buildBriefCoinsList = (
   return { briefAssets, totalBalancesValue };
 };
 
-export const buildUniqueTokenList = (
-  uniqueTokens: any,
-  selectedShowcaseTokens: any[] = []
-) => {
+export const buildUniqueTokenList = (uniqueTokens: any, selectedShowcaseTokens: any[] = []) => {
   let rows: any = [];
   const showcaseTokens = [];
   const bundledShowcaseTokens = [];
@@ -185,7 +177,7 @@ export const buildUniqueTokenList = (
   const grouped = groupBy(uniqueTokens, token => token.familyName);
   const families = Object.keys(grouped);
 
-  for (let family of families) {
+  for (const family of families) {
     const tokensRow: any = [];
     for (let j = 0; j < grouped[family].length; j += 2) {
       if (selectedShowcaseTokens.includes(grouped[family][j].uniqueId)) {
@@ -204,9 +196,7 @@ export const buildUniqueTokenList = (
     tokens = chunk(tokens, 50);
     // eslint-disable-next-line no-loop-func
     tokens.forEach((tokenChunk, index) => {
-      const id = tokensRow[0]
-        .map(({ uniqueId }: any) => uniqueId)
-        .join(`__${index}`);
+      const id = tokensRow[0].map(({ uniqueId }: any) => uniqueId).join(`__${index}`);
       rows.push({
         childrenAmount: grouped[family].length,
         familyImage: tokensRow?.[0]?.[0]?.familyImage ?? null,
@@ -222,10 +212,7 @@ export const buildUniqueTokenList = (
   rows = sortBy(rows, row => row.familyName.replace(regex, '').toLowerCase());
 
   showcaseTokens.sort(function (a, b) {
-    return (
-      selectedShowcaseTokens?.indexOf(a.uniqueId) -
-      selectedShowcaseTokens?.indexOf(b.uniqueId)
-    );
+    return selectedShowcaseTokens?.indexOf(a.uniqueId) - selectedShowcaseTokens?.indexOf(b.uniqueId);
   });
 
   for (let i = 0; i < showcaseTokens.length; i += 2) {
@@ -239,13 +226,11 @@ export const buildUniqueTokenList = (
     rows = [
       {
         childrenAmount: showcaseTokens.length,
-        familyName: 'Showcase',
+        familyName: i18n.t(i18n.l.account.tab_showcase),
         isHeader: true,
         stableId: 'showcase_stable_id',
         tokens: bundledShowcaseTokens,
-        uniqueId: `sc_${showcaseTokens
-          .map(({ uniqueId }) => uniqueId)
-          .join('__')}`,
+        uniqueId: `sc_${showcaseTokens.map(({ uniqueId }) => uniqueId).join('__')}`,
       },
     ].concat(rows);
   }
@@ -258,27 +243,25 @@ export const buildUniqueTokenList = (
   return rows;
 };
 
-const regex = RegExp(/\s*(the)\s/, 'i');
-
 export const buildBriefUniqueTokenList = (
-  uniqueTokens: any,
+  uniqueTokens: UniqueAsset[],
   selectedShowcaseTokens: any,
   sellingTokens: any[] = [],
   hiddenTokens: string[] = [],
   listType: AssetListType = 'wallet',
-  isReadOnlyWallet = false
+  isReadOnlyWallet = false,
+  nftSort = NftCollectionSortCriterion.MostRecent,
+  isFetchingNfts = false
 ) => {
   const hiddenUniqueTokensIds = uniqueTokens
     .filter(({ fullUniqueId }: any) => hiddenTokens.includes(fullUniqueId))
     .map(({ uniqueId }: any) => uniqueId);
-  const nonHiddenUniqueTokens = uniqueTokens.filter(
-    ({ fullUniqueId }: any) => !hiddenTokens.includes(fullUniqueId)
-  );
+  const nonHiddenUniqueTokens = uniqueTokens.filter(({ fullUniqueId }: any) => !hiddenTokens.includes(fullUniqueId));
   const uniqueTokensInShowcaseIds = nonHiddenUniqueTokens
     .filter(({ uniqueId }: any) => selectedShowcaseTokens?.includes(uniqueId))
     .map(({ uniqueId }: any) => uniqueId);
 
-  const filteredUniqueTokens = nonHiddenUniqueTokens.filter((token: any) => {
+  const filteredUniqueTokens = nonHiddenUniqueTokens.filter((token: UniqueAsset) => {
     if (listType === 'select-nft') {
       const format = getUniqueTokenFormat(token);
       const type = getUniqueTokenType(token);
@@ -286,18 +269,22 @@ export const buildBriefUniqueTokenList = (
     }
     return true;
   });
-  const grouped2 = groupBy(filteredUniqueTokens, token => token.familyName);
-  const families2 = sortBy(Object.keys(grouped2), row =>
-    row.replace(regex, '').toLowerCase()
-  );
+
+  // group the assets by collection name
+  const assetsByName = groupBy<UniqueAsset>(filteredUniqueTokens, token => token.familyName);
+
   const result = [
-    { type: 'NFTS_HEADER', uid: 'nfts-header' },
+    {
+      type: 'NFTS_HEADER',
+      nftSort,
+      uid: `nft-headers-${nftSort}`,
+    },
     { type: 'NFTS_HEADER_SPACE_AFTER', uid: 'nfts-header-space-after' },
   ];
   if (uniqueTokensInShowcaseIds.length > 0 && listType !== 'select-nft') {
     result.push({
       // @ts-expect-error "name" does not exist in type.
-      name: 'Showcase',
+      name: i18n.t(i18n.l.account.tab_showcase),
       total: uniqueTokensInShowcaseIds.length,
       type: 'FAMILY_HEADER',
       uid: 'showcase',
@@ -315,10 +302,11 @@ export const buildBriefUniqueTokenList = (
 
     result.push({ type: 'NFT_SPACE_AFTER', uid: `showcase-space-after` });
   }
+  // i18n all names
   if (sellingTokens.length > 0) {
     result.push({
       // @ts-expect-error "name" does not exist in type.
-      name: 'Selling',
+      name: i18n.t(i18n.l.nfts.selling),
       total: sellingTokens.length,
       type: 'FAMILY_HEADER',
       uid: 'selling',
@@ -335,30 +323,38 @@ export const buildBriefUniqueTokenList = (
     }
     result.push({ type: 'NFT_SPACE_AFTER', uid: `showcase-space-after` });
   }
-  for (let family of families2) {
-    result.push({
-      // @ts-expect-error ts-migrate(2769) FIXME: No overload matches this call.
-      image: grouped2[family][0].familyImage,
-      name: family,
-      total: grouped2[family].length,
-      type: 'FAMILY_HEADER',
-      uid: family,
-    });
-    const tokens = grouped2[family].map(({ uniqueId }) => uniqueId);
-    for (let index = 0; index < tokens.length; index++) {
-      const uniqueId = tokens[index];
 
-      // @ts-expect-error ts-migrate(2769) FIXME: No overload matches this call.
-      result.push({ index, type: 'NFT', uid: uniqueId, uniqueId });
+  if (!Object.keys(assetsByName).length) {
+    if (!isFetchingNfts) {
+      // empty NFT section
+      result.push({ type: 'NFTS_EMPTY', uid: `nft-empty` });
+    } else {
+      // loading NFTs section (most likely from a sortBy change) but initial load too
+      result.push({ type: 'NFTS_LOADING', uid: `nft-loading-${nftSort}` });
     }
+  } else {
+    for (const family of Object.keys(assetsByName)) {
+      result.push({
+        // @ts-expect-error ts-migrate(2769) FIXME: No overload matches this call.
+        image: assetsByName[family][0].familyImage,
+        name: family,
+        total: assetsByName[family].length,
+        type: 'FAMILY_HEADER',
+        uid: family,
+      });
+      const tokens = assetsByName[family].map(({ uniqueId }) => uniqueId);
+      for (let index = 0; index < tokens.length; index++) {
+        const uniqueId = tokens[index];
 
-    result.push({ type: 'NFT_SPACE_AFTER', uid: `${family}-space-after` });
+        // @ts-expect-error ts-migrate(2769) FIXME: No overload matches this call.
+        result.push({ index, type: 'NFT', uid: uniqueId, uniqueId });
+      }
+
+      result.push({ type: 'NFT_SPACE_AFTER', uid: `${family}-space-after` });
+    }
   }
-  if (
-    hiddenUniqueTokensIds.length > 0 &&
-    listType === 'wallet' &&
-    !isReadOnlyWallet
-  ) {
+
+  if (hiddenUniqueTokensIds.length > 0 && listType === 'wallet' && !isReadOnlyWallet) {
     result.push({
       // @ts-expect-error "name" does not exist in type.
       name: lang.t('button.hidden'),
@@ -379,15 +375,11 @@ export const buildBriefUniqueTokenList = (
 
     result.push({ type: 'NFT_SPACE_AFTER', uid: `showcase-space-after` });
   }
+
   return result;
 };
 
-export const buildUniqueTokenName = ({
-  collection,
-  id,
-  name,
-  uniqueId,
-}: any) => {
+export const buildUniqueTokenName = ({ collection, id, name, uniqueId }: any) => {
   if (name) return name;
   if (id) return `${collection?.name} #${id}`;
   return uniqueId;

@@ -30,6 +30,7 @@ module.exports = function (api) {
         root: ['./src'],
       },
     ],
+    '@babel/plugin-transform-export-namespace-from',
     'babel-plugin-styled-components',
     '@babel/plugin-proposal-numeric-separator',
     'date-fns',
@@ -45,18 +46,12 @@ module.exports = function (api) {
     ],
   ];
 
-  const presets = ['module:metro-react-native-babel-preset'];
+  const presets = ['module:@react-native/babel-preset'];
 
   return {
     env: {
       development: {
-        plugins: [
-          ...plugins,
-          [
-            'transform-remove-console',
-            { exclude: ['disableYellowBox', 'error', 'info', 'log'] },
-          ],
-        ],
+        plugins: [...plugins, ['transform-remove-console', { exclude: ['disableYellowBox', 'error', 'info', 'log'] }]],
         presets: presets,
       },
       production: {

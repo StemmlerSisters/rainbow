@@ -1,30 +1,18 @@
 import ConditionalWrap from 'conditional-wrap';
 import React, { useCallback, useEffect, useState } from 'react';
-import { IS_TESTING } from 'react-native-dotenv';
 import { Image } from 'react-native-image-crop-picker';
 import { atom, useSetRecoilState } from 'recoil';
 import ButtonPressAnimation from '../../animations/ButtonPressAnimation';
 import Skeleton from '../../skeleton/Skeleton';
 import AvatarCoverPhotoMaskSvg from '../../svg/AvatarCoverPhotoMaskSvg';
-import {
-  AccentColorProvider,
-  BackgroundProvider,
-  Box,
-  Cover,
-  Text,
-  useForegroundColor,
-} from '@/design-system';
+import { AccentColorProvider, BackgroundProvider, Box, Cover, Text, useForegroundColor } from '@/design-system';
 import { UniqueAsset } from '@/entities';
 import { UploadImageReturnData } from '@/handlers/pinata';
-import {
-  useENSModifiedRegistration,
-  useENSRegistration,
-  useENSRegistrationForm,
-  useSelectImageMenu,
-} from '@/hooks';
+import { useENSModifiedRegistration, useENSRegistration, useENSRegistrationForm, useSelectImageMenu } from '@/hooks';
 import { ImgixImage } from '@/components/images';
 import { magicMemo, stringifyENSNFTRecord } from '@/utils';
 import { ENS_RECORDS } from '@/helpers/ens';
+import { IS_TEST } from '@/env';
 
 export const avatarMetadataAtom = atom<Image | undefined>({
   default: undefined,
@@ -32,7 +20,6 @@ export const avatarMetadataAtom = atom<Image | undefined>({
 });
 
 const size = 70;
-const isTesting = IS_TESTING === 'true';
 
 const RegistrationAvatar = ({
   hasSeenExplainSheet,
@@ -48,25 +35,14 @@ const RegistrationAvatar = ({
   const {
     images: { avatarUrl: initialAvatarUrl },
   } = useENSModifiedRegistration();
-  const {
-    isLoading,
-    values,
-    onBlurField,
-    onRemoveField,
-    setDisabled,
-  } = useENSRegistrationForm();
+  const { isLoading, values, onBlurField, onRemoveField, setDisabled } = useENSRegistrationForm();
   const { name } = useENSRegistration();
 
   const [avatarUpdateAllowed, setAvatarUpdateAllowed] = useState(true);
-  const [avatarUrl, setAvatarUrl] = useState(
-    initialAvatarUrl || values?.avatar
-  );
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl || values?.avatar);
   useEffect(() => {
     if (avatarUpdateAllowed) {
-      const avatarUrl =
-        typeof initialAvatarUrl === 'string'
-          ? initialAvatarUrl
-          : values?.avatar;
+      const avatarUrl = typeof initialAvatarUrl === 'string' ? initialAvatarUrl : values?.avatar;
       setAvatarUrl(avatarUrl);
       onChangeAvatarUrl(avatarUrl ?? '');
     }
@@ -80,20 +56,10 @@ const RegistrationAvatar = ({
   const accentColor = useForegroundColor('accent');
 
   const onChangeImage = useCallback(
-    ({
-      asset,
-      image,
-    }: {
-      asset?: UniqueAsset;
-      image?: Image & { tmpPath?: string };
-    }) => {
+    ({ asset, image }: { asset?: UniqueAsset; image?: Image & { tmpPath?: string } }) => {
       setAvatarMetadata(image);
-      setAvatarUrl(
-        image?.tmpPath || asset?.lowResUrl || asset?.image_thumbnail_url || ''
-      );
-      onChangeAvatarUrl(
-        image?.path || asset?.lowResUrl || asset?.image_thumbnail_url || ''
-      );
+      setAvatarUrl(image?.tmpPath || asset?.lowResUrl || asset?.image_thumbnail_url || '');
+      onChangeAvatarUrl(image?.path || asset?.lowResUrl || asset?.image_thumbnail_url || '');
       if (asset) {
         const standard = asset.asset_contract?.schema_name || '';
         const contractAddress = asset.asset_contract?.address || '';
@@ -119,11 +85,7 @@ const RegistrationAvatar = ({
     [onBlurField, onChangeAvatarUrl, setAvatarMetadata]
   );
 
-  const {
-    ContextMenu,
-    handleSelectImage,
-    handleSelectNFT,
-  } = useSelectImageMenu({
+  const { ContextMenu, handleSelectImage, handleSelectNFT } = useSelectImageMenu({
     imagePickerOptions: {
       cropperCircleOverlay: true,
       cropping: true,
@@ -159,37 +121,20 @@ const RegistrationAvatar = ({
     <Box height={{ custom: size }} width={{ custom: size }}>
       <Cover alignHorizontal="center">
         <BackgroundProvider color="body (Deprecated)">
-          {({ backgroundColor }) => (
-            <AvatarCoverPhotoMaskSvg backgroundColor={backgroundColor as any} />
-          )}
+          {({ backgroundColor }) => <AvatarCoverPhotoMaskSvg backgroundColor={backgroundColor as any} />}
         </BackgroundProvider>
       </Cover>
       {isLoading ? (
         <Skeleton animated>
-          <Box
-            background="body (Deprecated)"
-            borderRadius={size / 2}
-            height={{ custom: size }}
-            width={{ custom: size }}
-          />
+          <Box background="body (Deprecated)" borderRadius={size / 2} height={{ custom: size }} width={{ custom: size }} />
         </Skeleton>
       ) : (
         <ConditionalWrap
-          condition={
-            hasSeenExplainSheet && !isTesting && (enableNFTs || !!avatarUrl)
-          }
+          condition={hasSeenExplainSheet && !IS_TEST && (enableNFTs || !!avatarUrl)}
           wrap={children => <ContextMenu>{children}</ContextMenu>}
         >
           <ButtonPressAnimation
-            onPress={
-              !hasSeenExplainSheet
-                ? onShowExplainSheet
-                : isTesting
-                ? handleSelectNFT
-                : enableNFTs
-                ? undefined
-                : handleSelectImage
-            }
+            onPress={!hasSeenExplainSheet ? onShowExplainSheet : IS_TEST ? handleSelectNFT : enableNFTs ? undefined : handleSelectImage}
             testID="use-select-image-avatar"
           >
             <AccentColorProvider color={accentColor + '10'}>
@@ -213,11 +158,7 @@ const RegistrationAvatar = ({
                   />
                 ) : (
                   <AccentColorProvider color={accentColor}>
-                    <Text
-                      color="accent"
-                      size="18px / 27px (Deprecated)"
-                      weight="heavy"
-                    >
+                    <Text color="accent" size="18px / 27px (Deprecated)" weight="heavy">
                       {` 􀣵 `}
                     </Text>
                   </AccentColorProvider>
@@ -231,8 +172,4 @@ const RegistrationAvatar = ({
   );
 };
 
-export default magicMemo(RegistrationAvatar, [
-  'hasSeenExplainSheet',
-  'onChangeAvatarUrl',
-  'onShowExplainSheet',
-]);
+export default magicMemo(RegistrationAvatar, ['hasSeenExplainSheet', 'onChangeAvatarUrl', 'onShowExplainSheet']);

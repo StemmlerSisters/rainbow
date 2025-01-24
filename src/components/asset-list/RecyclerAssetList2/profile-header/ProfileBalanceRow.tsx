@@ -1,26 +1,17 @@
 import * as React from 'react';
-import { useSelector } from 'react-redux';
 import Skeleton, { FakeText } from '@/components/skeleton/Skeleton';
 import { Box, Heading } from '@/design-system';
-import { AppState } from '@/redux/store';
 
 export const ProfileBalanceRowHeight = 24;
 
-export function ProfileBalanceRow({ totalValue }: { totalValue: string }) {
-  const isLoadingAssets = useSelector(
-    (state: AppState) => state.data.isLoadingAssets
-  );
-
+export function ProfileBalanceRow({ totalValue, isLoadingBalance }: { totalValue: string; isLoadingBalance: boolean }) {
   const placeholderHeight = ProfileBalanceRowHeight;
   const placeholderWidth = 200;
 
   return (
     <>
-      {isLoadingAssets ? (
-        <Box
-          height={{ custom: placeholderHeight }}
-          width={{ custom: placeholderWidth }}
-        >
+      {isLoadingBalance ? (
+        <Box height={{ custom: placeholderHeight }} width={{ custom: placeholderWidth }}>
           <Skeleton>
             <FakeText height={placeholderHeight} width={placeholderWidth} />
           </Skeleton>
@@ -29,11 +20,7 @@ export function ProfileBalanceRow({ totalValue }: { totalValue: string }) {
         <Heading
           color="label"
           numberOfLines={1}
-          size={
-            totalValue?.length > 14
-              ? '26px / 30px (Deprecated)'
-              : '34px / 41px (Deprecated)'
-          }
+          size={totalValue?.length > 14 ? '26px / 30px (Deprecated)' : '34px / 41px (Deprecated)'}
           weight="heavy"
           testID="balance-text"
         >

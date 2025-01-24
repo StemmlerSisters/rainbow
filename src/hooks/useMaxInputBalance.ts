@@ -1,22 +1,22 @@
 import { useCallback, useState } from 'react';
 import useGas from './useGas';
 import { ethereumUtils } from '@/utils';
-import { ParsedAddressAsset } from '@/entities';
+import { ParsedAddressAsset, UniqueAsset } from '@/entities';
 
 export default function useMaxInputBalance() {
-  const [maxInputBalance, setMaxInputBalance] = useState(0);
+  const [maxInputBalance, setMaxInputBalance] = useState<string>('0');
 
   const { selectedGasFee, l1GasFeeOptimism } = useGas();
 
   const updateMaxInputBalance = useCallback(
-    (inputCurrency: ParsedAddressAsset) => {
+    (inputCurrency: ParsedAddressAsset | UniqueAsset | undefined) => {
+      const isUniqueAssetOrUndefined = typeof inputCurrency === 'undefined' || 'collection' in inputCurrency;
+      if (isUniqueAssetOrUndefined) {
+        return '0';
+      }
       // Update current balance
-      const newInputBalance = ethereumUtils.getBalanceAmount(
-        selectedGasFee,
-        inputCurrency,
-        l1GasFeeOptimism
-      );
-      // @ts-expect-error ts-migrate(2345) FIXME: Argument of type 'string | number' is not assignab... Remove this comment to see the full error message
+      const newInputBalance = ethereumUtils.getBalanceAmount(selectedGasFee, inputCurrency, l1GasFeeOptimism);
+
       setMaxInputBalance(newInputBalance);
       return newInputBalance;
     },

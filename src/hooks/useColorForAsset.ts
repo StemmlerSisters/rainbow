@@ -12,28 +12,24 @@ export default function useColorForAsset(
 ) {
   // @ts-expect-error ts-migrate(2304) FIXME: Cannot find name 'useTheme'.
   const { isDarkMode: isDarkModeTheme, colors } = useTheme();
-  const accountAsset = ethereumUtils.getAssetFromAllAssets(
-    asset?.uniqueId || asset?.mainnet_address || asset?.address
-  );
-  const resolvedAddress =
-    asset?.mainnet_address || asset?.address || accountAsset?.address;
+  const accountAsset = ethereumUtils.getAssetFromAllAssets(asset?.uniqueId || asset?.mainnet_address || asset?.address);
+  const resolvedAddress = asset?.mainnet_address || asset?.address || accountAsset?.address;
 
-  const derivedColor = usePersistentDominantColorFromImage(
-    accountAsset?.icon_url || asset?.icon_url
-  );
+  const derivedColor = usePersistentDominantColorFromImage(accountAsset?.icon_url || asset?.icon_url);
   const isDarkMode = forceLightMode || isDarkModeTheme;
 
   const colorDerivedFromAddress = useMemo(() => {
+    if (!resolvedAddress) {
+      return undefined;
+    }
+
     const color = isETH(resolvedAddress)
       ? isDarkMode
         ? forceETHColor
           ? colors.appleBlue
           : colors.brighten(lightModeThemeColors.dark)
         : colors.dark
-      : pseudoRandomArrayItemFromString(
-          resolvedAddress,
-          colors.avatarBackgrounds
-        );
+      : pseudoRandomArrayItemFromString(resolvedAddress, colors.avatarBackgrounds);
     return color;
   }, [colors, forceETHColor, isDarkMode, resolvedAddress]);
 

@@ -1,68 +1,37 @@
 import lang from 'i18n-js';
 import React, { useMemo } from 'react';
-import { runOnJS, useAnimatedReaction } from 'react-native-reanimated';
-import { CoinIcon, CoinIconGroup } from '../../coin-icon';
-import { Column, ColumnWithMargins, Row, RowWithMargins } from '../../layout';
-import ChartAddToListButton from './ChartAddToListButton';
-import ChartContextButton from './ChartContextButton';
-import {
-  ChartDateLabel,
-  ChartHeaderSubtitle,
-  ChartPercentChangeLabel,
-  ChartPriceLabel,
-} from './chart-data-labels';
-import { useChartData } from '@/react-native-animated-charts/src';
-import { Network } from '@/helpers';
-import ChartTypes from '@/helpers/chartTypes';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { TIMING_CONFIGS } from '@/components/animations/animationConfigs';
+import RainbowCoinIcon from '@/components/coin-icon/RainbowCoinIcon';
+import { Stack, Text, TextShadow, Bleed } from '@/design-system';
 import { convertAmountToNativeDisplay } from '@/helpers/utilities';
-import { useAccountSettings, useBooleanState } from '@/hooks';
+import { useAccountSettings } from '@/hooks';
+import { useChartData } from '@/react-native-animated-charts/src';
 import styled from '@/styled-thing';
 import { padding } from '@/styles';
+import { ColumnWithMargins } from '../../layout';
+import { ChartPercentChangeLabel, ChartPriceLabel } from './chart-data-labels';
 
 const noPriceData = lang.t('expanded_state.chart.no_price_data');
 
 const Container = styled(ColumnWithMargins).attrs({
-  margin: 12,
-  marginTop: android ? -10 : 0,
+  margin: 20,
 })(({ showChart }) => ({
-  ...padding.object(0, 19, showChart ? (android ? 15 : 30) : 0),
+  ...padding.object(0, 19, showChart ? 36 : 0),
 }));
-
-function useTabularNumsWhileScrubbing() {
-  const [tabularNums, enable, disable] = useBooleanState();
-  // Only enable tabularNums on the price label when the user is scrubbing
-  // because we are obnoxiously into details
-  const { isActive } = useChartData();
-
-  useAnimatedReaction(
-    () => isActive.value,
-    useTabularNums => {
-      runOnJS(useTabularNums ? enable : disable)();
-    }
-  );
-
-  return tabularNums;
-}
 
 export default function ChartExpandedStateHeader({
   asset,
   color: givenColors,
-  dateRef,
   isPool,
   latestChange,
   latestPrice = noPriceData,
   priceRef,
   showChart,
-  testID,
-  chartType,
 }) {
-  const { colors } = useTheme();
-  const color = givenColors || colors.dark;
-  const tokens = useMemo(() => {
-    return isPool ? asset.tokens : [asset];
-  }, [asset, isPool]);
-  const { nativeCurrency, network: currentNetwork } = useAccountSettings();
-  const tabularNums = useTabularNumsWhileScrubbing();
+  const theme = useTheme();
+  const color = givenColors || theme.colors.dark;
+  const { nativeCurrency } = useAccountSettings();
 
   const isNoPriceData = latestPrice === noPriceData;
 
@@ -74,35 +43,7 @@ export default function ChartExpandedStateHeader({
 
   const titleOrNoPriceData = isNoPriceData ? noPriceData : title;
 
-  const showPriceChange = !isNoPriceData && showChart && !isNaN(latestChange);
-
-  const invertedChartTypes = Object.entries(ChartTypes).reduce(
-    (acc, [key, value]) => {
-      acc[value] = key;
-      return acc;
-    },
-    {}
-  );
-  const timespan = invertedChartTypes[chartType];
-
-  const formattedTimespan =
-    timespan.charAt(0).toUpperCase() + timespan.slice(1);
-
   const { data } = useChartData();
-
-  const defaultTimeValue = useMemo(() => {
-    if (chartType === ChartTypes.day) {
-      return lang.t('expanded_state.chart.today');
-    } else if (chartType === ChartTypes.max) {
-      return lang.t('expanded_state.chart.all_time');
-    } else {
-      return lang.t('expanded_state.chart.past_timespan', {
-        formattedTimespan,
-      });
-    }
-    // we need to make sure we recreate this value only when chart's data change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
 
   const price = useMemo(
     () => convertAmountToNativeDisplay(latestPrice, nativeCurrency),
@@ -115,77 +56,45 @@ export default function ChartExpandedStateHeader({
     const firstValue = data?.points?.[0]?.y;
     const lastValue = data?.points?.[data.points.length - 1]?.y;
 
-    return firstValue === Number(firstValue) ? lastValue / firstValue : 1;
+    return firstValue === Number(firstValue) ? lastValue / firstValue : undefined;
   }, [data]);
 
+  const showPriceChangeStyle = useAnimatedStyle(() => {
+    const showPriceChange = !isNoPriceData && showChart && !isNaN(latestChange.value);
+    return {
+      display: showPriceChange ? 'flex' : 'none',
+      opacity: withTiming(showPriceChange ? 1 : 0, TIMING_CONFIGS.slowFadeConfig),
+    };
+  });
+
   return (
-    <Container showChart={showChart}>
-      <Row
-        align="center"
-        justify="space-between"
-        testID={
-          testID ? `${testID}-expanded-state-header` : 'expanded-state-header'
-        }
-      >
-        {tokens.length === 1 ? (
-          <CoinIcon badgeXPosition={-7} badgeYPosition={0} {...asset} />
-        ) : (
-          <CoinIconGroup tokens={tokens} />
-        )}
-
-        <Row>
-          {currentNetwork === Network.mainnet && !isPool && (
-            <ChartAddToListButton asset={asset} />
-          )}
-          <ChartContextButton asset={asset} color={color} />
-        </Row>
-      </Row>
-      <Column>
-        <RowWithMargins
-          height={30}
-          justify="space-between"
-          marginHorizontal={1}
-        >
-          <ChartPriceLabel
-            defaultValue={title}
-            isNoPriceData={isNoPriceData}
-            isPool={isPool}
-            priceRef={priceRef}
-            priceValue={price}
-            tabularNums={tabularNums}
-          />
-          {showPriceChange && (
-            <ChartPercentChangeLabel
-              latestChange={latestChange}
-              ratio={ratio}
-            />
-          )}
-        </RowWithMargins>
-
-        <RowWithMargins
-          height={30}
-          justify="space-between"
-          marginHorizontal={android ? (isNoPriceData ? -7 : 0) : 1}
-          marginVertical={android ? 4 : 1}
-        >
-          <ChartHeaderSubtitle
-            color={
-              isNoPriceData ? colors.alpha(colors.blueGreyDark, 0.8) : color
-            }
+    <Container testID={'expanded-state-header'} showChart={showChart}>
+      <Stack space={'20px'}>
+        <RainbowCoinIcon
+          size={44}
+          icon={asset?.iconUrl}
+          chainId={asset?.chainId}
+          color={asset?.colors?.primary || asset?.colors?.fallback || undefined}
+          symbol={asset?.symbol}
+        />
+        <TextShadow blur={12} shadowOpacity={0.24}>
+          <Text
+            color={{ custom: isNoPriceData ? theme.colors.alpha(theme.colors.blueGreyDark, 0.8) : color }}
+            numberOfLines={1}
+            size="22pt"
             testID={`chart-header-${titleOrNoPriceData}`}
             weight={isNoPriceData ? 'semibold' : 'bold'}
           >
             {titleOrNoPriceData}
-          </ChartHeaderSubtitle>
-          {showPriceChange && (
-            <ChartDateLabel
-              chartTimeDefaultValue={defaultTimeValue}
-              dateRef={dateRef}
-              ratio={ratio}
-            />
-          )}
-        </RowWithMargins>
-      </Column>
+          </Text>
+        </TextShadow>
+        <ChartPriceLabel defaultValue={title} isNoPriceData={isNoPriceData} isPool={isPool} priceRef={priceRef} priceValue={price} />
+        <Animated.View style={showPriceChangeStyle}>
+          <Bleed top={'6px'}>
+            <ChartPercentChangeLabel latestChange={latestChange} ratio={ratio} />
+          </Bleed>
+        </Animated.View>
+      </Stack>
     </Container>
   );
 }
