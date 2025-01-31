@@ -1,15 +1,8 @@
 import React from 'react';
-import {
-  CoinDivider,
-  CoinDividerHeight,
-  SmallBalancesWrapper,
-} from '../coin-divider';
+import { CoinDivider, CoinDividerHeight, SmallBalancesWrapper } from '../coin-divider';
 import { CoinRowHeight } from '../coin-row';
-import { SavingsCoinRowHeight } from '../coin-row/SavingsCoinRow';
 import { FloatingActionButtonSize } from '../fab';
 import { ListFooter } from '../list';
-import PoolsListWrapper from '../pools/PoolsListWrapper';
-import SavingsListWrapper from '../savings/SavingsListWrapper';
 import { Header } from '../showcase/ShowcaseHeader';
 import { TokenFamilyHeaderHeight } from '../token-family';
 import { UniqueTokenRow } from '../unique-token';
@@ -21,16 +14,6 @@ const lastCoinRowAdditionalHeight = 1;
 const openSmallBalancesAdditionalHeight = 15;
 const closedSmallBalancesAdditionalHeight = 18;
 
-const savingsOpenAdditionalHeight = -7.5;
-const savingsClosedAdditionalHeight = -5;
-const savingsLastOpenAdditionalHeight = -13;
-const savingsLastClosedAdditionalHeight = -10;
-
-const poolsOpenAdditionalHeight = -12;
-const poolsClosedAdditionalHeight = -15;
-const poolsLastOpenAdditionalHeight = -14;
-const poolsLastClosedAdditionalHeight = -10.5;
-
 const firstUniqueTokenMarginTop = 4;
 const extraSpaceForDropShadow = 19;
 
@@ -39,8 +22,7 @@ const editModeAdditionalHeight = 100;
 
 export const ViewTypes = {
   HEADER: {
-    calculateHeight: ({ hideHeader = false }) =>
-      hideHeader ? 0 : AssetListHeaderHeight,
+    calculateHeight: ({ hideHeader = false }) => (hideHeader ? 0 : AssetListHeaderHeight),
     index: 0,
     renderComponent: ({ data, isCoinListEdited }) => {
       return <AssetListHeader {...data} isCoinListEdited={isCoinListEdited} />;
@@ -50,7 +32,7 @@ export const ViewTypes = {
 
   SHOWCASE_HEADER: {
     calculateHeight: () => 380,
-    index: 8,
+    index: 6,
     renderComponent: data => {
       return <Header {...data} />;
     },
@@ -61,9 +43,7 @@ export const ViewTypes = {
     calculateHeight: ({ isFirst, isLast, areSmallCollectibles }) =>
       CoinRowHeight +
       (isFirst ? firstCoinRowMarginTop : 0) +
-      (!isFirst && isLast && !areSmallCollectibles
-        ? ListFooter.height + lastCoinRowAdditionalHeight
-        : 0),
+      (!isFirst && isLast && !areSmallCollectibles ? ListFooter.height + lastCoinRowAdditionalHeight : 0),
     index: 1,
     renderComponent: ({ type, data }) => {
       const { item = {}, renderItem } = data;
@@ -81,12 +61,7 @@ export const ViewTypes = {
     index: 2,
     renderComponent: ({ data }) => {
       const { item = {} } = data;
-      return (
-        <CoinDivider
-          balancesSum={item.value}
-          defaultToEditButton={item.defaultToEditButton}
-        />
-      );
+      return <CoinDivider balancesSum={item.value} defaultToEditButton={item.defaultToEditButton} />;
     },
     visibleDuringCoinEdit: true,
   },
@@ -95,9 +70,7 @@ export const ViewTypes = {
     calculateHeight: ({ isOpen, smallBalancesLength, isCoinListEdited }) =>
       smallBalancesLength > 0
         ? isOpen
-          ? smallBalancesLength * CoinRowHeight +
-            openSmallBalancesAdditionalHeight +
-            (isCoinListEdited ? editModeAdditionalHeight : 0)
+          ? smallBalancesLength * CoinRowHeight + openSmallBalancesAdditionalHeight + (isCoinListEdited ? editModeAdditionalHeight : 0)
           : closedSmallBalancesAdditionalHeight
         : 0,
     index: 3,
@@ -121,47 +94,6 @@ export const ViewTypes = {
     visibleDuringCoinEdit: true,
   },
 
-  COIN_SAVINGS: {
-    calculateHeight: ({ isOpen, isLast, amountOfRows }) =>
-      isOpen
-        ? TokenFamilyHeaderHeight +
-          (isLast
-            ? ListFooter.height + savingsLastOpenAdditionalHeight
-            : savingsOpenAdditionalHeight) +
-          SavingsCoinRowHeight * amountOfRows
-        : TokenFamilyHeaderHeight +
-          (isLast
-            ? ListFooter.height + savingsLastClosedAdditionalHeight
-            : savingsClosedAdditionalHeight),
-    index: 4,
-    renderComponent: ({ data }) => {
-      const { item = {} } = data;
-      return (
-        <SavingsListWrapper assets={item.assets} totalValue={item.totalValue} />
-      );
-    },
-    visibleDuringCoinEdit: false,
-  },
-
-  POOLS: {
-    calculateHeight: ({ isOpen, isLast, amountOfRows }) =>
-      isOpen
-        ? TokenFamilyHeaderHeight +
-          (isLast
-            ? ListFooter.height + poolsLastOpenAdditionalHeight
-            : poolsOpenAdditionalHeight) +
-          CoinRowHeight * amountOfRows
-        : TokenFamilyHeaderHeight +
-          (isLast
-            ? ListFooter.height + poolsLastClosedAdditionalHeight
-            : poolsClosedAdditionalHeight),
-    index: 5,
-    renderComponent: ({ data, isCoinListEdited }) => {
-      return <PoolsListWrapper {...data} isCoinListEdited={isCoinListEdited} />;
-    },
-    visibleDuringCoinEdit: false,
-  },
-
   UNIQUE_TOKEN_ROW: {
     calculateHeight: ({ amountOfRows, isFirst, isHeader, isOpen }) => {
       const SectionHeaderHeight = isHeader ? TokenFamilyHeaderHeight : 0;
@@ -169,14 +101,10 @@ export const ViewTypes = {
       const heightOfRows = amountOfRows * UniqueTokenRow.cardSize;
       const heightOfRowMargins = UniqueTokenRow.cardMargin * (amountOfRows - 1);
       const height =
-        SectionHeaderHeight +
-        firstRowExtraTopPadding +
-        (isOpen
-          ? heightOfRows + heightOfRowMargins + extraSpaceForDropShadow
-          : 0);
+        SectionHeaderHeight + firstRowExtraTopPadding + (isOpen ? heightOfRows + heightOfRowMargins + extraSpaceForDropShadow : 0);
       return height;
     },
-    index: 6,
+    index: 4,
     renderComponent: ({ type, data, index, sections }) => {
       const { item = {}, renderItem } = data;
       return renderItem({
@@ -187,10 +115,7 @@ export const ViewTypes = {
         isFirst: type.isFirst,
         isHeader: type.isHeader,
         item: item.tokens,
-        shouldPrioritizeImageLoading:
-          index <
-          (sections?.[0]?.data?.length ?? 0) +
-            amountOfImagesWithForcedPrioritizeLoading,
+        shouldPrioritizeImageLoading: index < (sections?.[0]?.data?.length ?? 0) + amountOfImagesWithForcedPrioritizeLoading,
         uniqueId: item.uniqueId,
       });
     },
@@ -198,9 +123,8 @@ export const ViewTypes = {
   },
 
   FOOTER: {
-    calculateHeight: ({ paddingBottom }) =>
-      paddingBottom - FloatingActionButtonSize / 2,
-    index: 7,
+    calculateHeight: ({ paddingBottom }) => paddingBottom - FloatingActionButtonSize / 2,
+    index: 5,
     visibleDuringCoinEdit: false,
   },
   UNKNOWN: {

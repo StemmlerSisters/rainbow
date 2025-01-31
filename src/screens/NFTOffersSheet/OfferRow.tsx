@@ -1,26 +1,10 @@
 import React from 'react';
 import { useNavigation } from '@/navigation';
-import {
-  Bleed,
-  Box,
-  Column,
-  Columns,
-  globalColors,
-  Inline,
-  Inset,
-  Stack,
-  Text,
-  useBackgroundColor,
-  useColorMode,
-} from '@/design-system';
-import { CoinIcon } from '@/components/coin-icon';
+import { Bleed, Box, Column, Columns, globalColors, Inline, Inset, Stack, Text, useBackgroundColor, useColorMode } from '@/design-system';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { NftOffer } from '@/graphql/__generated__/arc';
 import { ImgixImage } from '@/components/images';
-import {
-  convertAmountToNativeDisplay,
-  handleSignificantDecimals,
-} from '@/helpers/utilities';
+import { convertAmountToNativeDisplay, handleSignificantDecimals } from '@/helpers/utilities';
 import { ButtonPressAnimation } from '@/components/animations';
 import * as i18n from '@/languages';
 import Routes from '@/navigation/routesNames';
@@ -29,6 +13,12 @@ import { useTheme } from '@/theme';
 import { CardSize } from '@/components/unique-token/CardSize';
 import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useExternalToken } from '@/resources/assets/externalAssetsQuery';
+import { Network } from '@/state/backendNetworks/types';
+import { useAccountSettings } from '@/hooks';
+import RainbowCoinIcon from '@/components/coin-icon/RainbowCoinIcon';
+import { AddressOrEth } from '@/__swaps__/types/assets';
+import { useBackendNetworksStore } from '@/state/backendNetworks/backendNetworks';
 
 const NFT_SIZE = 50;
 const MARKETPLACE_ORB_SIZE = 18;
@@ -50,9 +40,7 @@ export const FakeOfferRow = () => {
       <Columns space="16px" alignVertical="center">
         <Column width="content">
           <Box
-            background={
-              isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-            }
+            background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
             width={{ custom: NFT_SIZE }}
             height={{ custom: NFT_SIZE }}
             borderRadius={12}
@@ -61,17 +49,13 @@ export const FakeOfferRow = () => {
         <Column>
           <Stack space="10px">
             <Box
-              background={
-                isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-              }
+              background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
               width={{ custom: 70 }}
               height={{ custom: 12 }}
               borderRadius={6}
             />
             <Box
-              background={
-                isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-              }
+              background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
               width={{ custom: 100 }}
               height={{ custom: 9.3333 }}
               borderRadius={9.3333 / 2}
@@ -83,27 +67,21 @@ export const FakeOfferRow = () => {
             <Inline space="6px" alignVertical="center">
               <Bleed vertical="2px">
                 <Box
-                  background={
-                    isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-                  }
+                  background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
                   width={{ custom: COIN_ICON_SIZE }}
                   height={{ custom: COIN_ICON_SIZE }}
                   borderRadius={99}
                 />
               </Bleed>
               <Box
-                background={
-                  isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-                }
+                background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
                 width={{ custom: 90 }}
                 height={{ custom: 12 }}
                 borderRadius={6}
               />
             </Inline>
             <Box
-              background={
-                isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'
-              }
+              background={isDarkMode ? 'surfaceSecondaryElevated' : 'fillSecondary'}
               width={{ custom: 100 }}
               height={{ custom: 9.3333 }}
               borderRadius={9.3333 / 2}
@@ -117,8 +95,15 @@ export const FakeOfferRow = () => {
 
 export const OfferRow = ({ offer }: { offer: NftOffer }) => {
   const { navigate } = useNavigation();
+  const { nativeCurrency } = useAccountSettings();
   const { colorMode } = useColorMode();
   const bgColor = useBackgroundColor('surfaceSecondaryElevated');
+  const chainId = useBackendNetworksStore.getState().getChainsIdByName()[offer.network as Network];
+  const { data: externalAsset } = useExternalToken({
+    address: offer.paymentToken.address as AddressOrEth,
+    chainId,
+    currency: nativeCurrency,
+  });
 
   const isFloorDiffPercentagePositive = offer.floorDifferencePercentage >= 0;
   const dollarAmount = convertAmountToNativeDisplay(
@@ -162,9 +147,7 @@ export const OfferRow = ({ offer }: { offer: NftOffer }) => {
       }}
       style={{ marginVertical: 10, marginHorizontal: 20 }}
     >
-      <View
-        style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
         <View>
           <View
             style={{
@@ -176,10 +159,7 @@ export const OfferRow = ({ offer }: { offer: NftOffer }) => {
           >
             <View
               style={{
-                shadowColor:
-                  colorMode === 'dark' || !offer.nft.predominantColor
-                    ? globalColors.grey100
-                    : offer.nft.predominantColor,
+                shadowColor: colorMode === 'dark' || !offer.nft.predominantColor ? globalColors.grey100 : offer.nft.predominantColor,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.16,
                 shadowRadius: 6,
@@ -225,23 +205,20 @@ export const OfferRow = ({ offer }: { offer: NftOffer }) => {
               {dollarAmount}
             </Text>
           </View>
-          <Text
-            size="13pt"
-            weight="medium"
-            color="labelTertiary"
-            ellipsizeMode="tail"
-            numberOfLines={1}
-          >
+          <Text size="13pt" weight="medium" color="labelTertiary" ellipsizeMode="tail" numberOfLines={1}>
             {offer.nft.name}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <View style={{ flexDirection: 'row', paddingBottom: 10 }}>
             <View style={{ marginVertical: -2, paddingRight: 6 }}>
-              <CoinIcon
-                address={offer.paymentToken.address}
+              <RainbowCoinIcon
                 size={COIN_ICON_SIZE}
+                icon={externalAsset?.icon_url}
+                chainId={chainId}
                 symbol={offer.paymentToken.symbol}
+                color={externalAsset?.colors?.primary || externalAsset?.colors?.fallback || undefined}
+                showBadge={false}
               />
             </View>
             <Text size="17pt" weight="bold" color="label">
@@ -249,21 +226,11 @@ export const OfferRow = ({ offer }: { offer: NftOffer }) => {
             </Text>
           </View>
           <View style={{ flexDirection: 'row' }}>
-            <Text
-              size="13pt"
-              weight="medium"
-              color={isFloorDiffPercentagePositive ? 'green' : 'labelTertiary'}
-            >
-              {`${isFloorDiffPercentagePositive ? '+' : ''}${
-                offer.floorDifferencePercentage
-              }% `}
+            <Text size="13pt" weight="medium" color={isFloorDiffPercentagePositive ? 'green' : 'labelTertiary'}>
+              {`${isFloorDiffPercentagePositive ? '+' : ''}${offer.floorDifferencePercentage}% `}
             </Text>
             <Text size="13pt" weight="medium" color="labelTertiary">
-              {i18n.t(
-                isFloorDiffPercentagePositive
-                  ? i18n.l.nft_offers.sheet.above_floor
-                  : i18n.l.nft_offers.sheet.below_floor
-              )}
+              {i18n.t(isFloorDiffPercentagePositive ? i18n.l.nft_offers.sheet.above_floor : i18n.l.nft_offers.sheet.below_floor)}
             </Text>
           </View>
         </View>

@@ -5,16 +5,22 @@ import styled from '@/styled-thing';
 import { borders } from '@/styles';
 import ShadowStack from '@/react-native-shadow-stack';
 import { IS_ANDROID } from '@/env';
+import { useAccountAccentColor } from '@/hooks';
+import { useColorMode } from '@/design-system';
 
 const buildSmallShadows = (color, colors) => [
   [0, 3, 5, colors.shadow, 0.14],
   [0, 6, 10, colors.avatarBackgrounds[color] || color, 0.2],
 ];
 
-const sizeConfigs = (colors, isDarkMode) => ({
+const sizeConfigs = (accentColor, colors, isDarkMode) => ({
   header: {
-    dimensions: 34,
+    dimensions: 36,
     textSize: 'large',
+    shadow: [
+      [0, 4, 12, !isDarkMode && accentColor ? accentColor : colors.shadow, isDarkMode ? 0.16 : 0.2],
+      [0, 2, 6, colors.trueBlack, 0.02],
+    ],
   },
   large: {
     dimensions: 60,
@@ -37,6 +43,14 @@ const sizeConfigs = (colors, isDarkMode) => ({
     shadow: [[0, 4, 12, colors.shadow, isDarkMode ? 0.3 : 0.15]],
     textSize: 'larger',
   },
+  signing: {
+    dimensions: 44,
+    shadow: [
+      [0, 4, 12, !isDarkMode && accentColor ? accentColor : colors.shadow, isDarkMode ? 0.16 : 0.2],
+      [0, 2, 6, colors.trueBlack, 0.02],
+    ],
+    textSize: 25,
+  },
   small: {
     dimensions: 30,
     shadow: [[0, 3, 9, colors.shadow, 0.1]],
@@ -45,6 +59,11 @@ const sizeConfigs = (colors, isDarkMode) => ({
   smaller: {
     dimensions: 20,
     textSize: 'small',
+  },
+  smaller_shadowless: {
+    dimensions: 20,
+    textSize: 'small',
+    shadow: [[0, 0, 0, colors.shadow, 0]],
   },
   smedium: {
     dimensions: 36,
@@ -73,31 +92,20 @@ const Avatar = styled(ImgixImage)(({ dimensions }) => ({
   width: dimensions,
 }));
 
-const ImageAvatar = ({
-  image,
-  size = 'medium',
-  onLoad = undefined,
-  ...props
-}) => {
-  const { colors, isDarkMode } = useTheme();
-  const { dimensions, shadow } = useMemo(
-    () => sizeConfigs(colors, isDarkMode)[size],
-    [colors, isDarkMode, size]
-  );
+const ImageAvatar = ({ backgroundColor = '', image, size = 'medium', onLoad = undefined, ...props }) => {
+  const { accentColor } = useAccountAccentColor();
+  const { isDarkMode } = useColorMode();
+  const { colors } = useTheme();
 
-  const shadows = useMemo(
-    () =>
-      size === 'header' || size === 'smaller'
-        ? buildSmallShadows(colors.shadow, colors)
-        : shadow,
-    [shadow, size, colors]
-  );
+  const { dimensions, shadow } = useMemo(() => sizeConfigs(accentColor, colors, isDarkMode)[size], [accentColor, colors, isDarkMode, size]);
+
+  const shadows = useMemo(() => (size === 'smaller' ? buildSmallShadows(colors.shadow, colors) : shadow), [shadow, size, colors]);
 
   return (
     <ShadowStack
       {...props}
       {...borders.buildCircleAsObject(dimensions)}
-      backgroundColor={colors.white}
+      backgroundColor={backgroundColor || colors.white}
       shadows={shadows}
     >
       <Centered flex={1}>

@@ -1,6 +1,15 @@
+import { AddressOrEth, ExtendedAnimatedAssetWithColors, ParsedSearchAsset } from '@/__swaps__/types/assets';
+import { ChainId, Network } from '@/state/backendNetworks/types';
+import { SwapAssetType } from '@/__swaps__/types/swap';
+import { UnlockableAppIconKey } from '@/appIcons/appIcons';
 import { CardType } from '@/components/cards/GenericCard';
 import { LearnCategory } from '@/components/cards/utils/types';
 import { FiatProviderName } from '@/entities/f2c';
+import { RequestSource } from '@/utils/requestNavigationHandlers';
+import { CrosschainQuote, Quote, QuoteError } from '@rainbow-me/swaps';
+import { AnyPerformanceLog, Screen } from '../state/performance/operations';
+import { FavoritedSite } from '@/state/browser/favoriteDappsStore';
+import { TrendingToken } from '@/resources/trendingTokens/trendingTokens';
 
 /**
  * All events, used by `analytics.track()`
@@ -12,21 +21,19 @@ export const event = {
   appStateChange: 'State change',
   analyticsTrackingDisabled: 'analytics_tracking.disabled',
   analyticsTrackingEnabled: 'analytics_tracking.enabled',
+  promoSheetShown: 'promo_sheet.shown',
+  promoSheetDismissed: 'promo_sheet.dismissed',
   swapSubmitted: 'Submitted Swap',
   // notification promo sheet was shown
   notificationsPromoShown: 'notifications_promo.shown',
-  // only for iOS — initial prompt is not allowed — Android is enabled by default
-  notificationsPromoPermissionsBlocked:
-    'notifications_promo.permissions_blocked',
+  // only for iOS — initial prompt is not allowed — Android is enabled by default
+  notificationsPromoPermissionsBlocked: 'notifications_promo.permissions_blocked',
   // only for iOS, Android is enabled by default
-  notificationsPromoPermissionsGranted:
-    'notifications_promo.permissions_granted',
+  notificationsPromoPermissionsGranted: 'notifications_promo.permissions_granted',
   // if initially blocked, user must go to system settings and manually turn on notys
-  notificationsPromoSystemSettingsOpened:
-    'notifications_promo.system_settings_opened',
+  notificationsPromoSystemSettingsOpened: 'notifications_promo.system_settings_opened',
   // user enabled settings, and we sent them to our in-app settings
-  notificationsPromoNotificationSettingsOpened:
-    'notifications_promo.notification_settings_opened',
+  notificationsPromoNotificationSettingsOpened: 'notifications_promo.notification_settings_opened',
   // user either swiped the sheet away, or clicked "Not Now"
   notificationsPromoDismissed: 'notifications_promo.dismissed',
   cardPressed: 'card.pressed',
@@ -72,6 +79,8 @@ export const event = {
   wcNewSessionApproved: 'Approved new WalletConnect session',
   wcShowingSigningRequest: 'Showing Walletconnect signing request',
 
+  wcRequestFailed: 'wc.failed_request',
+
   nftOffersOpenedOffersSheet: 'Opened NFT Offers Sheet',
   nftOffersOpenedSingleOfferSheet: 'Opened NFT Single Offer Sheet',
   nftOffersViewedExternalOffer: 'Viewed external NFT Offer',
@@ -81,9 +90,127 @@ export const event = {
   poapsOpenedMintSheet: 'Opened POAP mint sheet',
   poapsMintedPoap: 'Minted POAP',
   poapsViewedOnPoap: 'Viewed POAP on poap.gallery',
+
   positionsOpenedSheet: 'Opened position Sheet',
   positionsOpenedExternalDapp: 'Viewed external dapp',
+
+  mintsPressedFeaturedMintCard: 'Pressed featured mint card',
+  mintsPressedCollectionCell: 'Pressed collection cell in mints card',
+  mintsPressedMintButton: 'Pressed mint button in mints sheet',
+  mintsPressedViewAllMintsButton: 'Pressed view all mints button in mints card',
+  mintsChangedFilter: 'Changed mints filter',
+
+  mintsOpenedSheet: 'Opened NFT Mint Sheet',
+  mintsOpeningMintDotFun: 'Opening Mintdotfun',
+  mintsMintingNFT: 'Minting NFT',
+  mintsMintedNFT: 'Minted NFT',
+  mintsErrorMintingNFT: 'Error Minting NFT',
+  pointsViewedWeeklyEarnings: 'Viewed weekly earnings',
+  pointsViewedClaimScreen: 'Viewed claim your points screen',
+  pointsViewedReferralScreen: 'Viewed points referral code screen',
+  pointsViewedPointsScreen: 'Viewed main points screen',
+  pointsViewedOnboardingSheet: 'Viewed points onboarding screen',
+  pointsReferralScreenValidatedReferralCode: 'Validated referral code',
+  pointsOnboardingScreenPressedSignInButton: 'Pressed sign in button on points onboarding screen',
+  pointsOnboardingScreenSuccessfullySignedIn: 'Successfully signed in on points onboarding screen',
+  pointsOnboardingScreenFailedToSignIn: 'Failed to sign in on points onboarding screen',
+  pointsOnboardingScreenPressedShareToXButton: 'Pressed share to X on points onboarding screen',
+  pointsOnboardingScreenPressedSkipShareToXButton: 'Pressed skip button on onboarding screen',
+  pointsOnboardingScreenPressedContinueButton: 'Pressed continue button on onboarding screen',
+  pointsOnboardingScreenPressedDoneButton: 'Pressed done button on onboarding screen',
+  pointsViewedWeeklyEarningsScreenPressedCloseButton: 'Pressed close button on weekly earnings screen',
+  pointsReferralCodeDeeplinkOpened: 'Opened points referral code deeplink',
+  pointsPointsScreenPressedCopyReferralCodeButton: 'Pressed copy referral code button on points screen',
+  pointsPointsScreenPressedShareReferralLinkButton: 'Pressed share referral link button on points screen',
+
+  remoteCardPrimaryButtonPressed: 'remote_card.primary_button_pressed',
+  remoteCardDismissed: 'remote_card.dismissed',
+
+  appIconUnlockSheetViewed: 'app_icon_unlock_sheet.viewed',
+  appIconUnlockSheetCTAPressed: 'app_icon_unlock_sheet.cta_pressed',
+
+  txRequestShownSheet: 'request.sheet.show',
+  txRequestReject: 'request.rejected',
+  txRequestApprove: 'request.approved',
+  addNewWalletGroupName: 'add_new_wallet_group.name',
+
+  // swaps related analytics
+  swapsSelectedAsset: 'swaps.selected_asset',
+  swapsSearchedForToken: 'swaps.searched_for_token',
+  swapsChangedChainId: 'swaps.changed_chain_id',
+  swapsFlippedAssets: 'swaps.flipped_assets',
+  swapsToggledDegenMode: 'swaps.toggled_degen_mode',
+  swapsReceivedQuote: 'swaps.received_quote',
+  swapsSubmitted: 'swaps.submitted',
+  swapsFailed: 'swaps.failed',
+  swapsSucceeded: 'swaps.succeeded',
+  swapsQuoteFailed: 'swaps.quote_failed',
+
+  // app browser events
+  browserTrendingDappClicked: 'browser.trending_dapp_pressed',
+  browserAddFavorite: 'browser.add_favorite',
+  browserTapFavorite: 'browser.tap_favorite',
+
+  performanceTimeToSign: 'performance.time_to_sign',
+  performanceTimeToSignOperation: 'performance.time_to_sign.operation',
+
+  addFavoriteToken: 'add_favorite_token',
+  watchWallet: 'watch_wallet',
+  watchedWalletCohort: 'watched_wallet_cohort',
+
+  // claimables
+  claimClaimableSucceeded: 'claim_claimable.succeeded',
+  claimClaimableFailed: 'claim_claimable.failed',
+  claimablePanelOpened: 'claimable_panel.opened',
+
+  // error boundary
+  errorBoundary: 'error_boundary.viewed',
+  errorBoundaryReset: 'error_boundary.reset',
+
+  // token details
+  tokenDetailsErc20: 'token_details.erc20',
+  tokenDetailsNFT: 'token_details.nft',
+
+  // token lists (wallet, swap, send)
+  tokenList: 'token_list',
+
+  // trending tokens
+  viewTrendingToken: 'trending_tokens.view_trending_token',
+  viewRankedCategory: 'trending_tokens.view_ranked_category',
+  changeNetworkFilter: 'trending_tokens.change_network_filter',
+  changeTimeframeFilter: 'trending_tokens.change_timeframe_filter',
+  changeSortFilter: 'trending_tokens.change_sort_filter',
+  hasLinkedFarcaster: 'trending_tokens.has_linked_farcaster',
 } as const;
+
+type SwapEventParameters<T extends 'swap' | 'crosschainSwap'> = {
+  type: T;
+  isBridge: boolean;
+  inputAssetSymbol: string;
+  inputAssetName: string;
+  inputAssetAddress: AddressOrEth;
+  inputAssetChainId: ChainId;
+  inputAssetAmount: number;
+  outputAssetSymbol: string;
+  outputAssetName: string;
+  outputAssetAddress: AddressOrEth;
+  outputAssetChainId: ChainId;
+  outputAssetAmount: number;
+  mainnetAddress: string;
+  tradeAmountUSD: number;
+  degenMode: boolean;
+  isSwappingToPopularAsset: boolean;
+  isSwappingToTrendingAsset: boolean;
+  isHardwareWallet: boolean;
+};
+
+type SwapsEventFailedParameters<T extends 'swap' | 'crosschainSwap'> = {
+  errorMessage: string | null;
+} & SwapEventParameters<T>;
+
+type SwapsEventSucceededParameters<T extends 'swap' | 'crosschainSwap'> = {
+  nonce: number | undefined;
+} & SwapEventParameters<T>;
 
 /**
  * Properties corresponding to each event
@@ -105,6 +232,14 @@ export type EventProperties = {
     usdValue: number;
     inputCurrencySymbol: string;
     outputCurrencySymbol: string;
+  };
+  [event.promoSheetShown]: {
+    campaign: string;
+    time_viewed: number;
+  };
+  [event.promoSheetDismissed]: {
+    campaign: string;
+    time_viewed: number;
   };
   [event.notificationsPromoShown]: undefined;
   [event.notificationsPromoPermissionsBlocked]: undefined;
@@ -242,6 +377,12 @@ export type EventProperties = {
     dappName: string;
     dappUrl: string;
   };
+  [event.wcRequestFailed]: {
+    type: 'session_proposal' | 'session_request' | 'read only wallet' | 'method not supported' | 'invalid namespaces' | 'dapp browser';
+    reason: string;
+    method?: string;
+  };
+
   [event.nftOffersOpenedOffersSheet]: {
     entryPoint: string;
   };
@@ -286,6 +427,37 @@ export type EventProperties = {
     rainbowFee: number;
     offerCurrency: { symbol: string; contractAddress: string };
   };
+  [event.mintsMintingNFT]: {
+    contract: string;
+    chainId: number;
+    quantity: number;
+    collectionName: string;
+    priceInEth: string;
+  };
+  [event.mintsMintedNFT]: {
+    contract: string;
+    chainId: number;
+    quantity: number;
+    collectionName: string;
+    priceInEth: string;
+  };
+  [event.mintsErrorMintingNFT]: {
+    contract: string;
+    chainId: number;
+    quantity: number;
+    collectionName: string;
+    priceInEth: string;
+  };
+  [event.mintsOpenedSheet]: {
+    contract: string;
+    chainId: number;
+    collectionName: string;
+  };
+  [event.mintsOpeningMintDotFun]: {
+    contract: string;
+    chainId: number;
+    collectionName: string;
+  };
   [event.poapsMintedPoap]: {
     eventId: number;
     type: 'qrHash' | 'secretWord';
@@ -303,5 +475,297 @@ export type EventProperties = {
   };
   [event.positionsOpenedSheet]: {
     dapp: string;
+  };
+  [event.mintsPressedFeaturedMintCard]: {
+    contractAddress: string;
+    chainId: number;
+    totalMints: number;
+    mintsLastHour: number;
+    priceInEth: number;
+  };
+  [event.mintsPressedCollectionCell]: {
+    contractAddress: string;
+    chainId: number;
+    priceInEth: number;
+  };
+  [event.mintsPressedMintButton]: {
+    contractAddress: string;
+    chainId: number;
+    priceInEth: number;
+  };
+  [event.mintsPressedViewAllMintsButton]: undefined;
+  [event.mintsChangedFilter]: { filter: string };
+  [event.pointsViewedClaimScreen]: undefined;
+  [event.pointsViewedReferralScreen]: undefined;
+  [event.pointsViewedPointsScreen]: undefined;
+  [event.pointsViewedOnboardingSheet]: undefined;
+  [event.pointsViewedWeeklyEarnings]: undefined;
+  [event.pointsReferralScreenValidatedReferralCode]: {
+    deeplinked: boolean;
+  };
+  [event.pointsOnboardingScreenPressedSignInButton]: {
+    deeplinked: boolean;
+    referralCode: boolean;
+    hardwareWallet: boolean;
+  };
+  [event.pointsOnboardingScreenSuccessfullySignedIn]: {
+    deeplinked: boolean;
+    referralCode: boolean;
+    hardwareWallet: boolean;
+  };
+  [event.pointsOnboardingScreenFailedToSignIn]: {
+    deeplinked: boolean;
+    referralCode: boolean;
+    hardwareWallet: boolean;
+    errorType: string | undefined;
+  };
+  [event.pointsOnboardingScreenPressedShareToXButton]: undefined;
+  [event.pointsOnboardingScreenPressedSkipShareToXButton]: undefined;
+  [event.pointsOnboardingScreenPressedContinueButton]: undefined;
+  [event.pointsOnboardingScreenPressedDoneButton]: undefined;
+  [event.pointsViewedWeeklyEarningsScreenPressedCloseButton]: undefined;
+  [event.pointsReferralCodeDeeplinkOpened]: undefined;
+  [event.pointsPointsScreenPressedCopyReferralCodeButton]: undefined;
+  [event.pointsPointsScreenPressedShareReferralLinkButton]: undefined;
+
+  [event.remoteCardPrimaryButtonPressed]: {
+    cardKey: string;
+    action: string;
+    props: string;
+  };
+  [event.remoteCardDismissed]: {
+    cardKey: string;
+  };
+
+  [event.appIconUnlockSheetViewed]: {
+    appIcon: UnlockableAppIconKey;
+  };
+  [event.appIconUnlockSheetCTAPressed]: {
+    appIcon: UnlockableAppIconKey;
+  };
+  [event.txRequestShownSheet]: {
+    requestType: 'transaction' | 'signature';
+    source: RequestSource;
+  };
+  [event.txRequestApprove]: {
+    requestType: 'transaction' | 'signature';
+    source: RequestSource;
+    dappName: string;
+    dappUrl: string;
+    isHardwareWallet: boolean;
+    network: Network;
+  };
+  [event.txRequestReject]: {
+    source: RequestSource;
+    requestType: 'transaction' | 'signature';
+    isHardwareWallet: boolean;
+  };
+  [event.addNewWalletGroupName]: {
+    name: string;
+  };
+
+  // swaps related events
+  [event.swapsSelectedAsset]: {
+    asset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    otherAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    type: SwapAssetType;
+  };
+
+  [event.swapsSearchedForToken]: {
+    query: string;
+    type: 'input' | 'output';
+  };
+
+  [event.swapsChangedChainId]: {
+    inputAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    type: 'input' | 'output';
+    chainId: ChainId;
+  };
+
+  [event.swapsFlippedAssets]: {
+    inputAmount: string | number;
+    previousInputAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    previousOutputAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+  };
+
+  [event.swapsToggledDegenMode]: {
+    enabled: boolean;
+  };
+
+  [event.swapsReceivedQuote]: {
+    inputAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    outputAsset: ParsedSearchAsset | ExtendedAnimatedAssetWithColors | null;
+    quote: Quote | CrosschainQuote | QuoteError | null;
+  };
+
+  [event.swapsSubmitted]: SwapEventParameters<'swap' | 'crosschainSwap'>;
+  [event.swapsFailed]: SwapsEventFailedParameters<'swap' | 'crosschainSwap'>;
+  [event.swapsSucceeded]: SwapsEventSucceededParameters<'swap' | 'crosschainSwap'>;
+
+  [event.swapsQuoteFailed]: {
+    error_code: number | undefined;
+    reason: string;
+    inputAsset: { symbol: string; address: string; chainId: ChainId };
+    inputAmount: string | number;
+    outputAsset: { symbol: string; address: string; chainId: ChainId };
+    outputAmount: string | number | undefined;
+  };
+
+  [event.browserTrendingDappClicked]: {
+    name: string;
+    url: string;
+    hasClickedBefore: boolean;
+    index: number;
+  };
+  [event.browserAddFavorite]: FavoritedSite;
+  [event.browserTapFavorite]: FavoritedSite;
+
+  [event.performanceTimeToSign]: {
+    screen: Screen;
+    completedAt: number;
+    elapsedTime: number;
+  };
+
+  [event.performanceTimeToSignOperation]: AnyPerformanceLog;
+
+  [event.addFavoriteToken]: {
+    address: AddressOrEth;
+    chainId: ChainId;
+    name: string;
+    symbol: string;
+  };
+
+  [event.watchWallet]: {
+    addressOrEnsName: string;
+    address: string;
+  };
+
+  [event.watchedWalletCohort]: {
+    numWatchedWallets: number;
+    watchedWalletsAddresses: string[];
+  };
+
+  [event.claimClaimableSucceeded]: {
+    claimableId: string;
+    claimableType: 'transaction' | 'sponsored';
+    chainId: ChainId;
+    asset: {
+      symbol: string;
+      address: string;
+    };
+    outputAsset: {
+      symbol: string;
+      address: string;
+    };
+    outputChainId: ChainId;
+    isSwapping: boolean;
+    amount: string;
+    usdValue: number;
+  };
+
+  [event.claimClaimableFailed]: {
+    claimableId: string;
+    claimableType: 'transaction' | 'sponsored';
+    chainId: ChainId;
+    asset: {
+      symbol: string;
+      address: string;
+    };
+    isSwapping: boolean;
+    outputAsset: {
+      symbol: string;
+      address: string;
+    };
+    outputChainId: ChainId;
+    failureStep: 'claim' | 'swap' | 'unknown';
+    amount: string;
+    usdValue: number;
+    errorMessage: string;
+  };
+
+  [event.claimablePanelOpened]: {
+    claimableId: string;
+    claimableType: 'transaction' | 'sponsored';
+    chainId: ChainId;
+    asset: {
+      symbol: string;
+      address: string;
+    };
+    amount: string;
+    usdValue: number;
+  };
+
+  [event.errorBoundary]: { error: Error | null };
+  [event.errorBoundaryReset]: { error: Error | null };
+
+  [event.tokenDetailsErc20]: {
+    token: {
+      address: string;
+      chainId: ChainId;
+      symbol: string;
+      name: string;
+      icon_url: string | undefined;
+      price: number | undefined;
+    };
+    eventSentAfterMs: number;
+    available_data: {
+      chart: boolean;
+      description: boolean;
+      iconUrl: boolean;
+    };
+  };
+  [event.tokenDetailsNFT]: {
+    token: {
+      isPoap: boolean;
+      isParty: boolean;
+      isENS: boolean;
+      address: string;
+      chainId: ChainId;
+      name: string;
+      image_url: string | null | undefined;
+    };
+    eventSentAfterMs: number;
+    available_data: { description: boolean; image_url: boolean; floorPrice: boolean };
+  };
+
+  [event.tokenList]: {
+    screen: 'wallet' | 'swap' | 'send' | 'discover';
+    total_tokens: number;
+    no_icon: number;
+    no_price?: number;
+    query?: string; // query is only sent for the swap screen
+  };
+
+  [event.viewTrendingToken]: {
+    address: TrendingToken['address'];
+    chainId: TrendingToken['chainId'];
+    symbol: TrendingToken['symbol'];
+    name: TrendingToken['name'];
+    highlightedFriends: number;
+  };
+
+  [event.viewRankedCategory]: {
+    category: string;
+    chainId: ChainId | undefined;
+    isLimited: boolean;
+    isEmpty: boolean;
+  };
+
+  [event.changeNetworkFilter]: {
+    chainId: ChainId | undefined;
+  };
+
+  [event.changeTimeframeFilter]: {
+    timeframe: string;
+  };
+
+  [event.changeSortFilter]: {
+    sort: string | undefined;
+  };
+
+  [event.hasLinkedFarcaster]: {
+    hasFarcaster: boolean;
+    personalizedTrending: boolean;
+    walletHash: string;
   };
 };

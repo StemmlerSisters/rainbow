@@ -1,41 +1,82 @@
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Image } from 'react-native-image-crop-picker';
 import { useRecoilValue } from 'recoil';
 import { avatarMetadataAtom } from '../components/ens-registration/RegistrationAvatar/RegistrationAvatar';
 import { coverMetadataAtom } from '../components/ens-registration/RegistrationCover/RegistrationCover';
-import { ENSActionParameters, RapActionTypes } from '../raps/common';
+import { ENSActionParameters, ENSRapActionType } from '@/raps/common';
 import usePendingTransactions from './usePendingTransactions';
-import {
-  useAccountSettings,
-  useCurrentNonce,
-  useENSRegistration,
-  useWalletENSAvatar,
-  useWallets,
-} from '.';
-import { Records, RegistrationParameters } from '@/entities';
+import { useAccountSettings, useENSRegistration, useWalletENSAvatar, useWallets } from '.';
+import { PendingTransaction, Records, RegistrationParameters } from '@/entities';
 import { fetchResolver } from '@/handlers/ens';
 import { saveNameFromLabelhash } from '@/handlers/localstorage/ens';
 import { uploadImage } from '@/handlers/pinata';
-import { getProviderForNetwork } from '@/handlers/web3';
-import {
-  ENS_DOMAIN,
-  generateSalt,
-  getRentPrice,
-  REGISTRATION_STEPS,
-} from '@/helpers/ens';
+import { getProvider } from '@/handlers/web3';
+import { ENS_DOMAIN, generateSalt, getRentPrice, REGISTRATION_STEPS } from '@/helpers/ens';
 import { loadWallet } from '@/model/wallet';
-import { executeRap } from '@/raps';
 import { timeUnits } from '@/references';
 import Routes from '@/navigation/routesNames';
-import { labelhash, logger } from '@/utils';
+import { labelhash } from '@/utils';
+import { getNextNonce } from '@/state/nonces';
+import { Hex } from 'viem';
+import { executeENSRap } from '@/raps/actions/ens';
+import store from '@/redux/store';
+import { performanceTracking, Screens, TimeToSignOperation } from '@/state/performance/performance';
+import { noop } from 'lodash';
+import { logger, RainbowError } from '@/logger';
+import { ChainId } from '@/state/backendNetworks/types';
+import { IS_IOS } from '@/env';
 
-const NOOP = () => null;
+// Generic type for action functions
+type ActionFunction<P extends any[] = [], R = void> = (...params: P) => Promise<R>;
 
-const formatENSActionParams = (
-  registrationParameters: RegistrationParameters
-): ENSActionParameters => {
+// Define action types using the generic ActionFunction
+export type ActionTypes = {
+  [REGISTRATION_STEPS.COMMIT]: ActionFunction<[callback?: () => void]>;
+  [REGISTRATION_STEPS.REGISTER]: ActionFunction<[callback?: () => void]>;
+  [REGISTRATION_STEPS.RENEW]: ActionFunction<[callback?: () => void]>;
+  [REGISTRATION_STEPS.EDIT]: ActionFunction<[callback?: () => void]>;
+  [REGISTRATION_STEPS.SET_NAME]: ActionFunction<[callback?: () => void]>;
+  [REGISTRATION_STEPS.TRANSFER]: ActionFunction<
+    [
+      params: {
+        clearRecords: boolean;
+        records: any;
+        name: string;
+        setAddress: boolean;
+        toAddress: string;
+        transferControl: boolean;
+        wallet?: any;
+      },
+      callback?: () => void,
+    ],
+    { nonce: number | undefined } | undefined
+  >;
+  [REGISTRATION_STEPS.WAIT_COMMIT_CONFIRMATION]: ActionFunction<[accentColor: string]>;
+  [REGISTRATION_STEPS.WAIT_ENS_COMMITMENT]: ActionFunction;
+};
+
+// Generic helper type to extract parameters from a function type
+type ParamsOf<T> = T extends (...args: infer P) => any ? P : never;
+
+// StepParams type derived from ActionTypes
+type StepParams = {
+  [K in keyof ActionTypes]: ParamsOf<ActionTypes[K]>[0] extends object ? ParamsOf<ActionTypes[K]>[0] : Record<string, never>;
+};
+
+// Generic hook type
+type UseENSRegistrationActionHandler = <T extends keyof StepParams>(params: {
+  step: T;
+  sendReverseRecord?: boolean;
+  yearsDuration?: number;
+}) => {
+  action: ActionTypes[T];
+};
+
+const formatENSActionParams = (registrationParameters: RegistrationParameters): ENSActionParameters => {
+  const { selectedGasFee, gasFeeParamsBySpeed } = store.getState().gas;
+
   return {
     duration: registrationParameters?.duration,
     mode: registrationParameters?.mode,
@@ -45,22 +86,13 @@ const formatENSActionParams = (
     rentPrice: registrationParameters?.rentPrice,
     salt: registrationParameters?.salt,
     setReverseRecord: registrationParameters?.setReverseRecord,
+    gasFeeParamsBySpeed,
+    selectedGasFee,
   };
 };
 
-export default function useENSRegistrationActionHandler(
-  {
-    sendReverseRecord = false,
-    yearsDuration = 1,
-    step: registrationStep,
-  }: {
-    yearsDuration?: number;
-    sendReverseRecord?: boolean;
-    step: keyof typeof REGISTRATION_STEPS;
-  } = {} as any
-) {
-  const { accountAddress, network } = useAccountSettings();
-  const getNextNonce = useCurrentNonce(accountAddress, network);
+const useENSRegistrationActionHandler: UseENSRegistrationActionHandler = ({ step, sendReverseRecord = false, yearsDuration = 1 }) => {
+  const { accountAddress } = useAccountSettings();
   const { registrationParameters } = useENSRegistration();
   const { navigate, goBack } = useNavigation();
   const { getPendingTransactionByHash } = usePendingTransactions();
@@ -83,8 +115,8 @@ export default function useENSRegistrationActionHandler(
       }
     };
 
-    (async () => {
-      provider = await getProviderForNetwork();
+    (() => {
+      provider = getProvider({ chainId: ChainId.mainnet });
       provider.on('block', updateAvatars);
     })();
     return () => {
@@ -93,28 +125,26 @@ export default function useENSRegistrationActionHandler(
   }, [updateWalletENSAvatars]);
 
   // actions
-  const commitAction = useCallback(
-    async (callback: () => void = NOOP) => {
+  const commitAction: ActionTypes[typeof REGISTRATION_STEPS.COMMIT] = useCallback(
+    async (callback = noop) => {
       updateAvatarsOnNextBlock.current = true;
 
-      const provider = await getProviderForNetwork();
-      const wallet = await loadWallet(undefined, false, provider);
+      const provider = getProvider({ chainId: ChainId.mainnet });
+      const wallet = await loadWallet({
+        showErrorIfNotLoaded: false,
+        provider,
+      });
       if (!wallet) {
         return;
       }
       const salt = generateSalt();
 
       const [nonce, rentPrice] = await Promise.all([
-        getNextNonce(),
-        getRentPrice(
-          registrationParameters.name.replace(ENS_DOMAIN, ''),
-          duration
-        ),
+        getNextNonce({ chainId: ChainId.mainnet, address: accountAddress }),
+        getRentPrice(registrationParameters.name.replace(ENS_DOMAIN, ''), duration),
       ]);
 
-      const hash = labelhash(
-        registrationParameters.name.replace(ENS_DOMAIN, '')
-      );
+      const hash = labelhash(registrationParameters.name.replace(ENS_DOMAIN, ''));
       await saveNameFromLabelhash(hash, registrationParameters.name);
 
       const commitEnsRegistrationParameters: ENSActionParameters = {
@@ -127,70 +157,55 @@ export default function useENSRegistrationActionHandler(
         salt,
       };
 
-      await executeRap(
-        wallet,
-        RapActionTypes.commitENS,
-        commitEnsRegistrationParameters,
-        () => {
-          if (isHardwareWallet) {
-            goBack();
-          }
-          callback;
+      await executeENSRap(wallet, ENSRapActionType.commitENS, commitEnsRegistrationParameters, () => {
+        if (isHardwareWallet) {
+          goBack();
         }
-      );
+        callback();
+      });
     },
-    [
-      getNextNonce,
-      registrationParameters,
-      duration,
-      accountAddress,
-      isHardwareWallet,
-      goBack,
-    ]
+    [registrationParameters, duration, accountAddress, isHardwareWallet, goBack]
   );
 
-  const speedUpCommitAction = useCallback(
+  const speedUpCommitAction: ActionTypes[typeof REGISTRATION_STEPS.WAIT_COMMIT_CONFIRMATION] = useCallback(
     async (accentColor: string) => {
-      // we want to speed up the last commit tx sent
-      const commitTransactionHash =
-        registrationParameters?.commitTransactionHash;
+      const commitTransactionHash = registrationParameters?.commitTransactionHash;
 
       const tx = getPendingTransactionByHash(commitTransactionHash || '');
-      commitTransactionHash &&
-        tx &&
-        navigate(
-          ios
-            ? Routes.SPEED_UP_AND_CANCEL_SHEET
-            : Routes.SPEED_UP_AND_CANCEL_BOTTOM_SHEET,
-          {
+      if (commitTransactionHash && tx) {
+        if (IS_IOS) {
+          navigate(Routes.SPEED_UP_AND_CANCEL_SHEET, {
             accentColor,
-            tx,
+            tx: tx as PendingTransaction,
             type: 'speed_up',
-          }
-        );
+          });
+        } else {
+          navigate(Routes.SPEED_UP_AND_CANCEL_BOTTOM_SHEET, {
+            accentColor,
+            tx: tx as PendingTransaction,
+            type: 'speed_up',
+          });
+        }
+      }
     },
-    [
-      getPendingTransactionByHash,
-      navigate,
-      registrationParameters?.commitTransactionHash,
-    ]
+    [getPendingTransactionByHash, navigate, registrationParameters?.commitTransactionHash]
   );
 
-  const registerAction = useCallback(
-    async (callback: () => void = NOOP) => {
-      const {
-        name,
-        duration,
-      } = registrationParameters as RegistrationParameters;
+  const registerAction: ActionTypes[typeof REGISTRATION_STEPS.REGISTER] = useCallback(
+    async (callback = noop) => {
+      const { name, duration } = registrationParameters as RegistrationParameters;
 
-      const provider = await getProviderForNetwork();
-      const wallet = await loadWallet(undefined, false, provider);
+      const provider = getProvider({ chainId: ChainId.mainnet });
+      const wallet = await loadWallet({
+        showErrorIfNotLoaded: false,
+        provider,
+      });
       if (!wallet) {
         return;
       }
 
       const [nonce, rentPrice, changedRecords] = await Promise.all([
-        getNextNonce(),
+        getNextNonce({ chainId: ChainId.mainnet, address: accountAddress }),
         getRentPrice(name.replace(ENS_DOMAIN, ''), duration),
         uploadRecordImages(registrationParameters.changedRecords, {
           avatar: avatarMetadata,
@@ -208,40 +223,28 @@ export default function useENSRegistrationActionHandler(
         setReverseRecord: sendReverseRecord,
       };
 
-      await executeRap(
-        wallet,
-        RapActionTypes.registerENS,
-        registerEnsRegistrationParameters,
-        callback
-      );
+      await executeENSRap(wallet, ENSRapActionType.registerENS, registerEnsRegistrationParameters, callback);
 
       updateAvatarsOnNextBlock.current = true;
     },
-    [
-      accountAddress,
-      avatarMetadata,
-      coverMetadata,
-      getNextNonce,
-      registrationParameters,
-      sendReverseRecord,
-    ]
+    [accountAddress, avatarMetadata, coverMetadata, registrationParameters, sendReverseRecord]
   );
 
-  const renewAction = useCallback(
-    async (callback: () => void = NOOP) => {
+  const renewAction: ActionTypes[typeof REGISTRATION_STEPS.RENEW] = useCallback(
+    async (callback = noop) => {
       const { name } = registrationParameters as RegistrationParameters;
 
-      const provider = await getProviderForNetwork();
-      const wallet = await loadWallet(undefined, false, provider);
+      const provider = getProvider({ chainId: ChainId.mainnet });
+      const wallet = await loadWallet({
+        showErrorIfNotLoaded: false,
+        provider,
+      });
       if (!wallet) {
         return;
       }
 
-      const nonce = await getNextNonce();
-      const rentPrice = await getRentPrice(
-        name.replace(ENS_DOMAIN, ''),
-        duration
-      );
+      const nonce = await getNextNonce({ chainId: ChainId.mainnet, address: accountAddress });
+      const rentPrice = await getRentPrice(name.replace(ENS_DOMAIN, ''), duration);
 
       const registerEnsRegistrationParameters: ENSActionParameters = {
         ...formatENSActionParams(registrationParameters),
@@ -250,27 +253,25 @@ export default function useENSRegistrationActionHandler(
         rentPrice: rentPrice.toString(),
       };
 
-      await executeRap(
-        wallet,
-        RapActionTypes.renewENS,
-        registerEnsRegistrationParameters,
-        callback
-      );
+      await executeENSRap(wallet, ENSRapActionType.renewENS, registerEnsRegistrationParameters, callback);
     },
-    [duration, getNextNonce, registrationParameters]
+    [accountAddress, duration, registrationParameters]
   );
 
-  const setNameAction = useCallback(
-    async (callback: () => void = NOOP) => {
+  const setNameAction: ActionTypes[typeof REGISTRATION_STEPS.SET_NAME] = useCallback(
+    async (callback = noop) => {
       const { name } = registrationParameters as RegistrationParameters;
 
-      const provider = await getProviderForNetwork();
-      const wallet = await loadWallet(undefined, false, provider);
+      const provider = getProvider({ chainId: ChainId.mainnet });
+      const wallet = await loadWallet({
+        showErrorIfNotLoaded: false,
+        provider,
+      });
       if (!wallet) {
         return;
       }
 
-      const nonce = await getNextNonce();
+      const nonce = await getNextNonce({ chainId: ChainId.mainnet, address: accountAddress });
 
       const registerEnsRegistrationParameters: ENSActionParameters = {
         ...formatENSActionParams(registrationParameters),
@@ -279,26 +280,24 @@ export default function useENSRegistrationActionHandler(
         ownerAddress: accountAddress,
       };
 
-      await executeRap(
-        wallet,
-        RapActionTypes.setNameENS,
-        registerEnsRegistrationParameters,
-        callback
-      );
+      await executeENSRap(wallet, ENSRapActionType.setNameENS, registerEnsRegistrationParameters, callback);
     },
-    [accountAddress, getNextNonce, registrationParameters]
+    [accountAddress, registrationParameters]
   );
 
-  const setRecordsAction = useCallback(
-    async (callback: () => void = NOOP) => {
-      const provider = await getProviderForNetwork();
-      const wallet = await loadWallet(undefined, false, provider);
+  const setRecordsAction: ActionTypes[typeof REGISTRATION_STEPS.EDIT] = useCallback(
+    async (callback = noop) => {
+      const provider = getProvider({ chainId: ChainId.mainnet });
+      const wallet = await loadWallet({
+        showErrorIfNotLoaded: false,
+        provider,
+      });
       if (!wallet) {
         return;
       }
 
       const [nonce, changedRecords, resolver] = await Promise.all([
-        getNextNonce(),
+        getNextNonce({ chainId: ChainId.mainnet, address: accountAddress }),
         uploadRecordImages(registrationParameters.changedRecords, {
           avatar: avatarMetadata,
           header: coverMetadata,
@@ -311,52 +310,32 @@ export default function useENSRegistrationActionHandler(
         nonce,
         ownerAddress: accountAddress,
         records: changedRecords,
-        resolverAddress: resolver?.address,
+        resolverAddress: resolver?.address as Hex,
         setReverseRecord: sendReverseRecord,
       };
 
-      await executeRap(
-        wallet,
-        RapActionTypes.setRecordsENS,
-        setRecordsEnsRegistrationParameters,
-        callback
-      );
+      await executeENSRap(wallet, ENSRapActionType.setRecordsENS, setRecordsEnsRegistrationParameters, callback);
 
       updateAvatarsOnNextBlock.current = true;
     },
-    [
-      accountAddress,
-      avatarMetadata,
-      coverMetadata,
-      getNextNonce,
-      registrationParameters,
-      sendReverseRecord,
-    ]
+    [accountAddress, avatarMetadata, coverMetadata, registrationParameters, sendReverseRecord]
   );
 
-  const transferAction = useCallback(
-    async (
-      callback: () => void = NOOP,
-      {
-        clearRecords,
-        records,
-        name,
-        setAddress,
-        toAddress,
-        transferControl,
-        wallet: walletOverride,
-      }: any
-    ) => {
+  const transferAction: ActionTypes[typeof REGISTRATION_STEPS.TRANSFER] = useCallback(
+    async ({ clearRecords, records, name, setAddress, toAddress, transferControl, wallet: walletOverride }, callback = noop) => {
       let wallet = walletOverride;
       if (!wallet) {
-        const provider = await getProviderForNetwork();
-        wallet = await loadWallet(undefined, false, provider);
+        const provider = getProvider({ chainId: ChainId.mainnet });
+        wallet = await loadWallet({
+          showErrorIfNotLoaded: false,
+          provider,
+        });
       }
       if (!wallet) {
         return;
       }
 
-      const nonce = await getNextNonce();
+      const nonce = await getNextNonce({ chainId: ChainId.mainnet, address: accountAddress });
 
       const transferEnsParameters: ENSActionParameters = {
         ...formatENSActionParams({
@@ -372,54 +351,36 @@ export default function useENSRegistrationActionHandler(
         transferControl,
       };
 
-      const { nonce: newNonce } = await executeRap(
-        wallet,
-        RapActionTypes.transferENS,
-        transferEnsParameters,
-        callback
-      );
+      const { nonce: newNonce } = await performanceTracking.getState().executeFn({
+        fn: executeENSRap,
+        screen: Screens.SEND_ENS,
+        operation: TimeToSignOperation.BroadcastTransaction,
+      })(wallet, ENSRapActionType.transferENS, transferEnsParameters, callback);
 
       return { nonce: newNonce };
     },
-    [accountAddress, getNextNonce, registrationParameters]
+    [accountAddress, registrationParameters]
   );
 
-  const actions = useMemo(
-    () => ({
-      [REGISTRATION_STEPS.COMMIT]: commitAction,
-      [REGISTRATION_STEPS.EDIT]: setRecordsAction,
-      [REGISTRATION_STEPS.REGISTER]: registerAction,
-      [REGISTRATION_STEPS.RENEW]: renewAction,
-      [REGISTRATION_STEPS.SET_NAME]: setNameAction,
-      [REGISTRATION_STEPS.TRANSFER]: transferAction,
-      [REGISTRATION_STEPS.WAIT_COMMIT_CONFIRMATION]: speedUpCommitAction,
-      [REGISTRATION_STEPS.WAIT_ENS_COMMITMENT]: () => null,
-    }),
-    [
-      commitAction,
-      registerAction,
-      renewAction,
-      setNameAction,
-      setRecordsAction,
-      speedUpCommitAction,
-      transferAction,
-    ]
-  );
+  const actions: ActionTypes = {
+    [REGISTRATION_STEPS.COMMIT]: commitAction,
+    [REGISTRATION_STEPS.EDIT]: setRecordsAction,
+    [REGISTRATION_STEPS.REGISTER]: registerAction,
+    [REGISTRATION_STEPS.RENEW]: renewAction,
+    [REGISTRATION_STEPS.SET_NAME]: setNameAction,
+    [REGISTRATION_STEPS.TRANSFER]: transferAction,
+    [REGISTRATION_STEPS.WAIT_COMMIT_CONFIRMATION]: speedUpCommitAction,
+    [REGISTRATION_STEPS.WAIT_ENS_COMMITMENT]: () => Promise.resolve(),
+  };
 
   return {
-    action: actions[registrationStep] as (...args: any) => void,
+    action: actions[step] as ActionTypes[typeof step],
   };
-}
+};
 
-async function uploadRecordImages(
-  records: Partial<Records> | undefined,
-  imageMetadata: { avatar?: Image; header?: Image }
-) {
+async function uploadRecordImages(records: Partial<Records> | undefined, imageMetadata: { avatar?: Image; header?: Image }) {
   const uploadRecordImage = async (key: 'avatar' | 'header') => {
-    if (
-      (records?.[key]?.startsWith('~') || records?.[key]?.startsWith('file')) &&
-      imageMetadata[key]
-    ) {
+    if ((records?.[key]?.startsWith('~') || records?.[key]?.startsWith('file')) && imageMetadata[key]) {
       try {
         const { url } = await uploadImage({
           filename: imageMetadata[key]?.filename || '',
@@ -428,17 +389,16 @@ async function uploadRecordImages(
         });
         return url;
       } catch (error) {
-        logger.sentry('[uploadRecordImages] Failed to upload image.', error);
+        logger.error(new RainbowError('[useENSRegistrationActionHandler]: Failed to upload image.'), {
+          error,
+        });
         return undefined;
       }
     }
     return records?.[key];
   };
 
-  const [avatar, header] = await Promise.all([
-    uploadRecordImage('avatar'),
-    uploadRecordImage('header'),
-  ]);
+  const [avatar, header] = await Promise.all([uploadRecordImage('avatar'), uploadRecordImage('header')]);
 
   return {
     ...records,
@@ -446,3 +406,5 @@ async function uploadRecordImages(
     header,
   };
 }
+
+export default useENSRegistrationActionHandler;

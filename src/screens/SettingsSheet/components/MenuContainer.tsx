@@ -1,18 +1,26 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
-import { Box, Inset, Stack } from '@/design-system';
+import { Box, Inset, Space, Stack } from '@/design-system';
 
 interface MenuContainerProps {
+  scrollviewRef?: React.RefObject<ScrollView>;
   children: React.ReactNode;
   Footer?: React.ReactNode;
   testID?: string;
+  space?: Space;
 }
 
-const MenuContainer = ({ children, testID, Footer }: MenuContainerProps) => {
+const MenuContainer = ({ scrollviewRef, children, testID, Footer, space = '36px' }: MenuContainerProps) => {
   return (
     // ios scroll fix
-    <Inset {...(ios && { bottom: '42px (Deprecated)', top: '12px' })}>
+    <Inset
+      {...(ios && {
+        bottom: '42px (Deprecated)',
+        top: '12px',
+      })}
+    >
       <ScrollView
+        ref={scrollviewRef}
         scrollEventThrottle={32}
         // ios scroll fix
         {...(ios && { style: { overflow: 'visible' } })}
@@ -26,7 +34,7 @@ const MenuContainer = ({ children, testID, Footer }: MenuContainerProps) => {
             paddingTop: { custom: 7 },
           })}
         >
-          <Stack space="36px">{children}</Stack>
+          <Stack space={space}>{children}</Stack>
         </Box>
         {Footer}
       </ScrollView>

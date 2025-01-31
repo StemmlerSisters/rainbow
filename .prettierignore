@@ -10,3 +10,5 @@ rainbow-scripts
 .vscode
 __generated__
 coverage
+InjectedJSBundle.js
+.yarn

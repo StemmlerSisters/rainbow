@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { createQueryKey, queryClient, QueryFunctionArgs } from '@/react-query';
-import { getProviderForNetwork } from '@/handlers/web3';
+import { getProvider } from '@/handlers/web3';
+import { ChainId } from '@/state/backendNetworks/types';
 
 // Set a default stale time of 10 seconds so we don't over-fetch
 // (query will serve cached data & invalidate after 10s).
@@ -17,16 +18,13 @@ export type ENSAddressArgs = {
 // ///////////////////////////////////////////////
 // Query Key
 
-const ensAddressQueryKey = ({ name }: ENSAddressArgs) =>
-  createQueryKey('ensAddress', { name }, { persisterVersion: 1 });
+const ensAddressQueryKey = ({ name }: ENSAddressArgs) => createQueryKey('ensAddress', { name }, { persisterVersion: 1 });
 
 // ///////////////////////////////////////////////
 // Query Function
 
-async function ensAddressQueryFunction({
-  queryKey: [{ name }],
-}: QueryFunctionArgs<typeof ensAddressQueryKey>) {
-  const provider = await getProviderForNetwork();
+async function ensAddressQueryFunction({ queryKey: [{ name }] }: QueryFunctionArgs<typeof ensAddressQueryKey>) {
+  const provider = getProvider({ chainId: ChainId.mainnet });
   const address = await provider.resolveName(name);
   return address;
 }
@@ -34,35 +32,21 @@ async function ensAddressQueryFunction({
 // ///////////////////////////////////////////////
 // Query Prefetcher
 
-export async function prefetchENSAddress(
-  { name }: ENSAddressArgs,
-  { staleTime = defaultStaleTime }: { staleTime?: number } = {}
-) {
-  return await queryClient.prefetchQuery(
-    ensAddressQueryKey({ name }),
-    ensAddressQueryFunction,
-    { staleTime }
-  );
+export async function prefetchENSAddress({ name }: ENSAddressArgs, { staleTime = defaultStaleTime }: { staleTime?: number } = {}) {
+  return await queryClient.prefetchQuery(ensAddressQueryKey({ name }), ensAddressQueryFunction, { staleTime });
 }
 
 // ///////////////////////////////////////////////
 // Query Fetcher
 
 export async function fetchENSAddress({ name }: ENSAddressArgs) {
-  return await queryClient.fetchQuery(
-    ensAddressQueryKey({ name }),
-    ensAddressQueryFunction,
-    { staleTime: defaultStaleTime }
-  );
+  return await queryClient.fetchQuery(ensAddressQueryKey({ name }), ensAddressQueryFunction, { staleTime: defaultStaleTime });
 }
 
 // ///////////////////////////////////////////////
 // Query Hook
 
-export function useENSAddress(
-  { name }: ENSAddressArgs,
-  { enabled }: { enabled?: boolean } = {}
-) {
+export function useENSAddress({ name }: ENSAddressArgs, { enabled }: { enabled?: boolean } = {}) {
   return useQuery(ensAddressQueryKey({ name }), ensAddressQueryFunction, {
     enabled,
     staleTime: defaultStaleTime,

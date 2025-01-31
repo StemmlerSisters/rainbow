@@ -1,21 +1,17 @@
 import { Storage } from '@/storage';
-import {
-  deprecatedGetLocal,
-  deprecatedRemoveLocal,
-} from '@/handlers/localstorage/common';
+import { deprecatedGetLocal, deprecatedRemoveLocal } from '@/handlers/localstorage/common';
 
 import { Legacy } from '@/storage/schema';
 import { logger, RainbowError } from '@/logger';
+
+export const REACT_QUERY_STORAGE_ID = 'rainbow.react-query';
 
 /**
  * Storage for legacy data that was previously stored in AsyncStorage. Only
  * difference is that `get()` is `async`, because it first checks for data in
  * AsyncStorage before returning it.
  */
-class LegacyStorage<Scopes extends unknown[], Schema> extends Storage<
-  Scopes,
-  Schema
-> {
+class LegacyStorage<Scopes extends unknown[], Schema> extends Storage<Scopes, Schema> {
   /**
    * IMPORTANT: This method is async, different from our other MMKV storage
    * classes. It migrates data from AsyncStorage to MMKV, and then removes it,
@@ -27,9 +23,7 @@ class LegacyStorage<Scopes extends unknown[], Schema> extends Storage<
    *   `await get([scope, key])`
    */
   // @ts-ignore Not the same signature as the parent class
-  async get<Key extends keyof Schema>(
-    scopes: [...Scopes, Key]
-  ): Promise<Schema[Key] | undefined> {
+  async get<Key extends keyof Schema>(scopes: [...Scopes, Key]): Promise<Schema[Key] | undefined> {
     const key = scopes.join(this.sep);
     const res = this.store.getString(key);
 
@@ -40,7 +34,7 @@ class LegacyStorage<Scopes extends unknown[], Schema> extends Storage<
         deprecatedRemoveLocal(key); // then remove if successful
         return this.get(scopes); // continue as normal
       } catch (e) {
-        logger.error(new RainbowError(`Storage: error migrating legacy data`), {
+        logger.error(new RainbowError(`[storage]: error migrating legacy data`), {
           key,
         });
         return undefined;
@@ -58,3 +52,5 @@ class LegacyStorage<Scopes extends unknown[], Schema> extends Storage<
  * instance instead of this one.
  */
 export const legacy = new LegacyStorage<[], Legacy>({ id: 'global' });
+export const zustandStorage = new LegacyStorage<[], Legacy>({ id: 'zustand' });
+export const queryStorage = new LegacyStorage<[], Legacy>({ id: REACT_QUERY_STORAGE_ID });

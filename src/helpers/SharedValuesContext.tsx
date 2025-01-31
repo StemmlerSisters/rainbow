@@ -1,10 +1,10 @@
-import React, { PropsWithChildren, useContext, useMemo } from 'react';
-import Animated, { useSharedValue } from 'react-native-reanimated';
+import React, { PropsWithChildren, useMemo } from 'react';
+import { useSharedValue, SharedValue } from 'react-native-reanimated';
 import { useCoinListEdited } from '@/hooks';
 
 const Context = React.createContext<
   | {
-      isCoinListEdited: Animated.SharedValue<boolean>;
+      isCoinListEdited: SharedValue<boolean>;
     }
   | undefined
 >(undefined);
@@ -23,6 +23,10 @@ export function SharedValuesProvider({ children }: PropsWithChildren) {
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
-export function useIsCoinListEditedSharedValue() {
-  return useContext(Context)!.isCoinListEdited;
-}
+export const useSharedValuesContext = () => {
+  const context = React.useContext(Context);
+  if (context === undefined) {
+    throw new Error('useSharedValuesContext must be used within a SharedValuesProvider');
+  }
+  return context;
+};

@@ -7,12 +7,11 @@ import RecyclerAssetList2 from './RecyclerAssetList2';
 import EmptyAssetList from './EmptyAssetList';
 import * as i18n from '@/languages';
 
-const FabSizeWithPadding =
-  FloatingActionButtonSize + FabWrapperBottomPosition * 2;
+const FabSizeWithPadding = FloatingActionButtonSize + FabWrapperBottomPosition * 2;
 
 const AssetList = ({
+  accentColor,
   hideHeader,
-  isEmpty,
   isLoading,
   isWalletEthZero,
   network,
@@ -35,15 +34,13 @@ const AssetList = ({
   ) : props.showcase ? (
     <RecyclerAssetList
       hideHeader={hideHeader}
-      paddingBottom={
-        insets.bottom + FabSizeWithPadding - ListFooter.height + (android && 60)
-      }
+      paddingBottom={insets.bottom + FabSizeWithPadding - ListFooter.height + (android && 60)}
       scrollViewTracker={scrollViewTracker}
       sections={sections}
       {...props}
     />
   ) : (
-    <RecyclerAssetList2 walletBriefSectionsData={walletBriefSectionsData} />
+    <RecyclerAssetList2 accentColor={accentColor} walletBriefSectionsData={walletBriefSectionsData} />
   );
 };
 
