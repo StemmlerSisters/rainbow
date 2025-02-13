@@ -2,14 +2,15 @@ import React, { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { initials } from '../../utils';
-import ChainBadge from '../coin-icon/ChainBadge';
 import { Centered } from '../layout';
 import { Text } from '../text';
-import { CoinIconSize } from './CoinIcon';
 import { ImgixImage } from '@/components/images';
 import styled from '@/styled-thing';
 import { position } from '@/styles';
 import ShadowStack from '@/react-native-shadow-stack';
+import { ChainImage } from './ChainImage';
+
+const RequestVendorLogoIconSize = 40;
 
 const RVLIBorderRadius = 16.25;
 const RVLIShadows = colors => ({
@@ -25,15 +26,16 @@ const Content = styled(Centered)(({ size, color }) => ({
 
 export default function RequestVendorLogoIcon({
   backgroundColor,
-  badgeYPosition = 14,
+  badgeXPosition = -10,
+  badgeYPosition = 0,
   borderRadius = RVLIBorderRadius,
   dappName,
   imageUrl,
   noShadow,
   shouldPrioritizeImageLoading,
   showLargeShadow,
-  size = CoinIconSize,
-  network,
+  size = RequestVendorLogoIconSize,
+  chainId,
   ...props
 }) {
   const [error, setError] = useState(null);
@@ -42,15 +44,11 @@ export default function RequestVendorLogoIcon({
   // When dapps have no icon the bgColor provided to us is transparent.
   // Having a transparent background breaks our UI, so we instead show a background
   // color of white.
-  const bgColor =
-    backgroundColor === 'transparent'
-      ? colors.white
-      : backgroundColor || colors.dark;
+  const bgColor = backgroundColor === 'transparent' ? colors.white : backgroundColor || colors.dark;
 
   const imageSource = useMemo(
     () => ({
-      priority:
-        ImgixImage.priority[shouldPrioritizeImageLoading ? 'high' : 'low'],
+      priority: ImgixImage.priority[shouldPrioritizeImageLoading ? 'high' : 'low'],
       uri: imageUrl,
     }),
     [imageUrl, shouldPrioritizeImageLoading]
@@ -63,33 +61,19 @@ export default function RequestVendorLogoIcon({
         {...position.sizeAsObject(size)}
         backgroundColor={colors.white}
         borderRadius={borderRadius}
-        shadows={
-          RVLIShadows(colors)[
-            noShadow ? 'none' : showLargeShadow ? 'large' : 'default'
-          ]
-        }
+        shadows={RVLIShadows(colors)[noShadow ? 'none' : showLargeShadow ? 'large' : 'default']}
       >
         <Content color={bgColor} size={size}>
           {imageUrl && !error ? (
-            <ImgixImage
-              onError={setError}
-              source={imageSource}
-              style={position.sizeAsObject('100%')}
-              size={200}
-            />
+            <ImgixImage onError={setError} source={imageSource} style={position.sizeAsObject('100%')} size={200} />
           ) : (
-            <Text
-              align="center"
-              color={colors.getFallbackTextColor(bgColor)}
-              size="smedium"
-              weight="semibold"
-            >
+            <Text align="center" color={colors.getFallbackTextColor(bgColor)} size="smedium" weight="semibold">
               {initials(dappName)}
             </Text>
           )}
         </Content>
       </ShadowStack>
-      <ChainBadge assetType={network} badgeYPosition={badgeYPosition} />
+      <ChainImage badgeXPosition={badgeXPosition} badgeYPosition={badgeYPosition} chainId={chainId} style={{ zIndex: 100 }} />
     </View>
   );
 }

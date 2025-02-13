@@ -12,13 +12,7 @@ import { moonpayGetWidgetURL } from '@/resources/f2c';
 import { WrappedAlert } from '@/helpers/alert';
 import * as lang from '@/languages';
 
-export function Moonpay({
-  accountAddress,
-  config,
-}: {
-  accountAddress: string;
-  config: ProviderConfig;
-}) {
+export function Moonpay({ accountAddress, config }: { accountAddress: string; config: ProviderConfig }) {
   return (
     <ButtonPressAnimation
       onPress={async () => {
@@ -41,13 +35,13 @@ export function Moonpay({
             sessionId,
           });
 
-          logger.info('F2C: opening provider', {
+          logger.debug('[AddCash]: opening provider', {
             provider: FiatProviderName.Moonpay,
           });
 
           Linking.openURL(url);
         } catch (e) {
-          logger.error(new RainbowError('F2C: failed to open provider'), {
+          logger.error(new RainbowError('[AddCash]: failed to open provider'), {
             provider: FiatProviderName.Moonpay,
             message: (e as Error).message,
           });

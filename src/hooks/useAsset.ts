@@ -1,25 +1,34 @@
 import { useMemo } from 'react';
 import useAccountAsset from './useAccountAsset';
-import useCollectible from './useCollectible';
-import { AssetTypes, ParsedAddressAsset } from '@/entities';
+import { getUniqueId } from '@/utils/ethereumUtils';
+import { useExternalToken } from '@/resources/assets/externalAssetsQuery';
+import { useSelector } from 'react-redux';
+import { AppState } from '@/redux/store';
+import { ChainId } from '@/state/backendNetworks/types';
+import { Address } from 'viem';
 
 // To fetch an asset from account assets,
 // generic assets, and uniqueTokens
-export default function useAsset(asset: ParsedAddressAsset) {
-  const accountAsset = useAccountAsset(
-    asset?.uniqueId || asset?.mainnet_address || asset?.address
+export default function useAsset({ address, chainId }: { address: Address; chainId: ChainId }) {
+  const nativeCurrency = useSelector((state: AppState) => state.settings.nativeCurrency);
+  const uniqueId = getUniqueId(address, chainId);
+  const accountAsset = useAccountAsset(uniqueId);
+  const { data: externalAsset } = useExternalToken(
+    {
+      address,
+      chainId,
+      currency: nativeCurrency,
+    },
+    { enabled: !accountAsset }
   );
-  const uniqueToken = useCollectible(asset);
-  return useMemo(() => {
-    if (!asset) return null;
 
-    let matched = null;
-    if (asset.type === AssetTypes.token) {
-      matched = accountAsset;
-    } else if (asset.type === AssetTypes.nft) {
-      matched = uniqueToken;
+  return useMemo(() => {
+    if (accountAsset) {
+      return accountAsset;
+    } else if (externalAsset) {
+      return externalAsset;
     }
 
-    return matched || asset;
-  }, [accountAsset, asset, uniqueToken]);
+    return null;
+  }, [accountAsset, externalAsset]);
 }

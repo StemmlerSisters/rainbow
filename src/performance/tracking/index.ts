@@ -1,37 +1,28 @@
-import { IS_TESTING, SENTRY_ENVIRONMENT } from 'react-native-dotenv';
+import { SENTRY_ENVIRONMENT } from 'react-native-dotenv';
+import { analytics } from '@/analytics';
+import { IS_TEST } from '@/env';
+import { collectResultForPerformanceToast } from './PerformanceToast';
 import { PerformanceMetricData } from './types/PerformanceMetricData';
 import { PerformanceMetricsType } from './types/PerformanceMetrics';
 import { PerformanceTagsType } from './types/PerformanceTags';
-import { analytics } from '@/analytics';
 /*
 This will be a version for all performance tracking events.
 If we make breaking changes we will be able to take it into consideration when doing analytics
  */
 const performanceTrackingVersion = 2;
 const shouldLogToConsole = __DEV__ || SENTRY_ENVIRONMENT === 'LocalRelease';
-const shouldReportMeasurement =
-  IS_TESTING === 'false' && !__DEV__ && SENTRY_ENVIRONMENT !== 'LocalRelease';
+const shouldReportMeasurement = !IS_TEST && !__DEV__ && SENTRY_ENVIRONMENT !== 'LocalRelease';
 const logTag = '[PERFORMANCE]: ';
 
-function logDurationIfAppropriate(
-  metric: PerformanceMetricsType,
-  durationInMs: number,
-  ...additionalArgs: any[]
-) {
+function logDurationIfAppropriate(metric: PerformanceMetricsType, durationInMs: number, ...additionalArgs: unknown[]) {
   if (shouldLogToConsole) {
-    global.console.log(
-      `${logTag}${metric}, duration: ${durationInMs.toFixed(2)}ms`,
-      ...additionalArgs
-    );
+    global.console.log(`${logTag}${metric}, duration: ${durationInMs.toFixed(2)}ms`, ...additionalArgs);
   }
 }
 
-const currentlyTrackedMetrics = new Map<
-  PerformanceMetricsType,
-  PerformanceMetricData
->();
+export const currentlyTrackedMetrics = new Map<PerformanceMetricsType, PerformanceMetricData>();
 
-interface AdditionalParams extends Record<string, any> {
+interface AdditionalParams extends Record<string, unknown> {
   tag?: PerformanceTagsType;
 }
 
@@ -43,12 +34,9 @@ interface AdditionalParams extends Record<string, any> {
  * @param durationInMs How long did it take
  * @param additionalParams Any additional context you want to add to your log
  */
-function logDirectly(
-  metric: PerformanceMetricsType,
-  durationInMs: number,
-  additionalParams?: AdditionalParams
-) {
+function logDirectly(metric: PerformanceMetricsType, durationInMs: number, additionalParams?: AdditionalParams) {
   logDurationIfAppropriate(metric, durationInMs);
+  collectResultForPerformanceToast(metric, durationInMs);
   if (shouldReportMeasurement) {
     analytics.track(metric, {
       durationInMs,
@@ -65,10 +53,7 @@ function logDirectly(
  * @param metric What you're measuring
  * @param additionalParams Any additional context you want to add to your log
  */
-function startMeasuring(
-  metric: PerformanceMetricsType,
-  additionalParams?: AdditionalParams
-) {
+function startMeasuring(metric: PerformanceMetricsType, additionalParams?: AdditionalParams) {
   const startTime = performance.now();
 
   currentlyTrackedMetrics.set(metric, {
@@ -88,17 +73,20 @@ function startMeasuring(
  * @param additionalParams Any additional context you want to add to your log
  * @returns True if the measurement was collected and commited properly, false otherwise
  */
-function finishMeasuring(
-  metric: PerformanceMetricsType,
-  additionalParams?: AdditionalParams
-): boolean {
+function finishMeasuring(metric: PerformanceMetricsType, additionalParams?: AdditionalParams): boolean {
   const savedEntry = currentlyTrackedMetrics.get(metric);
   if (savedEntry === undefined || savedEntry.startTimestamp === undefined) {
     return false;
   }
-
   const finishTime = performance.now();
+
   const durationInMs = finishTime - savedEntry.startTimestamp;
+  currentlyTrackedMetrics.set(metric, {
+    ...savedEntry,
+    finishTimestamp: finishTime,
+  });
+
+  collectResultForPerformanceToast(metric, durationInMs);
 
   if (shouldReportMeasurement) {
     analytics.track(metric, {
@@ -108,6 +96,7 @@ function finishMeasuring(
       ...additionalParams,
     });
   }
+
   logDurationIfAppropriate(metric, durationInMs);
   currentlyTrackedMetrics.delete(metric);
   return true;
@@ -123,17 +112,17 @@ function clearMeasure(metric: PerformanceMetricsType) {
 
 /**
  * Function decorator, that tracks performance of a function using performance.now() calls
- * and logs the result with segment.
+ * and logs the result with analytics.
  * @param fn Function which performance will be measured
  * @param metric What you're measuring, the name of the metric
  * @param additionalParams Any additional context you want to add to your log
  */
-export function withPerformanceTracking<Fn extends (...args: any[]) => any>(
+export function withPerformanceTracking<Fn extends (...args: Parameters<Fn>) => ReturnType<Fn>>(
   fn: Fn,
   metric: PerformanceMetricsType,
   additionalParams?: AdditionalParams
 ): (...args: Parameters<Fn>) => ReturnType<Fn> {
-  return function wrapper(this: any, ...args: Parameters<Fn>): ReturnType<Fn> {
+  return function wrapper(this: unknown, ...args: Parameters<Fn>): ReturnType<Fn> {
     const startTime = performance.now();
 
     const res = fn.apply(this, args);

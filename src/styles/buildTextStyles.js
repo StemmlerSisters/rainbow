@@ -23,11 +23,31 @@ function selectBestFontFit(weight) {
     return 'Regular';
   }
 }
+function capitalizeFirstLetterWorklet(string) {
+  'worklet';
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function selectBestFontFitWorklet(weight) {
+  'worklet';
+  if (weight) {
+    if (weight === 900) {
+      return 'Heavy';
+    }
+    if (weight >= 700) {
+      return 'Bold';
+    }
+    if (weight >= 500) {
+      return 'Semibold';
+    }
+    return weight <= 400 ? 'Regular' : capitalizeFirstLetterWorklet(weight);
+  } else {
+    return 'Regular';
+  }
+}
 
 function familyFontWithAndroidWidth(weight, family) {
-  return `${fonts.family[family]}${
-    android ? `-${selectBestFontFit(weight)}` : ''
-  }`;
+  return `${fonts.family[family]}${android ? `-${selectBestFontFit(weight)}` : ''}`;
 }
 
 export function fontWithWidth(weight, family = 'SFProRounded') {
@@ -39,42 +59,44 @@ export function fontWithWidth(weight, family = 'SFProRounded') {
   };
 }
 
+function familyFontWithAndroidWidthWorklet(weight, family) {
+  'worklet';
+  return `${fonts.family[family]}${android ? `-${selectBestFontFitWorklet(weight)}` : ''}`;
+}
+
+export function fontWithWidthWorklet(weight, family = 'SFProRounded') {
+  'worklet';
+  return {
+    fontFamily: familyFontWithAndroidWidthWorklet(weight, family),
+    // https://github.com/facebook/react-native/issues/18820
+    // https://www.youtube.com/watch?v=87rhZTumujw
+    ...(ios ? { fontWeight: weight } : { fontWeight: 'normal' }),
+  };
+}
+
 const buildTextStyles = css`
   /* Color */
-  color: ${({ color, theme }) =>
-    colors.get(color, theme.colors) || theme.colors.dark};
+  color: ${({ color, theme }) => colors.get(color, theme.colors) || theme.colors.dark};
 
   /* Font Family */
   ${({ isEmoji, family = 'SFProRounded', mono, weight }) => {
-    const t = isEmoji
-      ? ''
-      : `font-family: ${familyFontWithAndroidWidth(weight, family, mono)};`;
+    const t = isEmoji ? '' : `font-family: ${familyFontWithAndroidWidth(weight, family, mono)};`;
     return t;
   }}
 
   /* Font Size */
-  font-size:  ${({ size = 'medium' }) =>
-    typeof size === 'number' ? size : fonts?.size?.[size] ?? size};
+  font-size:  ${({ size = 'medium' }) => (typeof size === 'number' ? size : fonts?.size?.[size] ?? size)};
 
   /* Font Weight */
-  ${({ isEmoji, weight = 'regular' }) =>
-    isEmoji || isNil(weight) || android
-      ? ''
-      : `font-weight: ${fonts?.weight?.[weight] ?? weight};`}
+  ${({ isEmoji, weight = 'regular' }) => (isEmoji || isNil(weight) || android ? '' : `font-weight: ${fonts?.weight?.[weight] ?? weight};`)}
 
   /* Letter Spacing */
   ${({ letterSpacing = 'rounded' }) =>
-    isNil(letterSpacing)
-      ? ''
-      : `letter-spacing: ${
-          fonts?.letterSpacing?.[letterSpacing] ?? letterSpacing
-        };`}
+    isNil(letterSpacing) ? '' : `letter-spacing: ${fonts?.letterSpacing?.[letterSpacing] ?? letterSpacing};`}
 
   /* Line Height */
   ${({ isEmoji, lineHeight }) =>
-    isNil(lineHeight) || (isEmoji && android)
-      ? ''
-      : `line-height: ${fonts?.lineHeight?.[lineHeight] ?? lineHeight};`}
+    isNil(lineHeight) || (isEmoji && android) ? '' : `line-height: ${fonts?.lineHeight?.[lineHeight] ?? lineHeight};`}
 
   /* Opacity */
   ${({ opacity }) => (isNil(opacity) ? '' : `opacity: ${opacity};`)}

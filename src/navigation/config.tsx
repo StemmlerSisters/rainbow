@@ -5,13 +5,10 @@ import { useTheme } from '@/theme/ThemeContext';
 import colors from '@/theme/currentColors';
 import styled from '@/styled-thing';
 import { fonts } from '@/styles';
-import networkTypes from '@/helpers/networkTypes';
 import WalletBackupStepTypes from '@/helpers/walletBackupStepTypes';
 import { deviceUtils, safeAreaInsetValues } from '@/utils';
-import { getNetworkObj } from '@/networks';
 import { getPositionSheetHeight } from '@/screens/positions/PositionSheet';
 
-import BackButton from '@/components/header/BackButton';
 import { Icon } from '@/components/icons';
 import { SheetHandleFixedToTopHeight } from '@/components/sheet';
 import { Text } from '@/components/text';
@@ -24,12 +21,15 @@ import { getSheetHeight as getSendConfirmationSheetHeight } from '@/screens/Send
 
 import { onWillPop } from '@/navigation/Navigation';
 import { HARDWARE_WALLET_TX_NAVIGATOR_SHEET_HEIGHT } from '@/navigation/HardwareWalletTxNavigator';
-import {
-  StackNavigationOptions,
-  createStackNavigator,
-} from '@react-navigation/stack';
+import { StackNavigationOptions } from '@react-navigation/stack';
 import { PartialNavigatorConfigOptions } from '@/navigation/types';
 import { BottomSheetNavigationOptions } from '@/navigation/bottom-sheet/types';
+import { Box } from '@/design-system';
+import { IS_ANDROID } from '@/env';
+import { SignTransactionSheetRouteProp } from '@/screens/SignTransactionSheet';
+import { RequestSource } from '@/utils/requestNavigationHandlers';
+import { ChainId } from '@/state/backendNetworks/types';
+import { useBackendNetworksStore } from '@/state/backendNetworks/backendNetworks';
 
 export const sharedCoolModalTopOffset = safeAreaInsetValues.top;
 
@@ -68,13 +68,11 @@ const buildCoolModalConfig = (params: any): CoolModalConfigOptions => ({
         ? 30
         : 0.666 // 0.666 gets the screen corner radius internally
       : params.cornerRadius === 0
-      ? 0
-      : params.cornerRadius || 39,
+        ? 0
+        : params.cornerRadius || 39,
   customStack: true,
   disableShortFormAfterTransitionToLongForm:
-    params.disableShortFormAfterTransitionToLongForm ||
-    params?.type === 'token' ||
-    params?.type === 'uniswap',
+    params.disableShortFormAfterTransitionToLongForm || params?.type === 'token' || params?.type === 'uniswap',
   gestureEnabled: true,
   headerHeight: params.headerHeight || 25,
   ignoreBottomOffset: true,
@@ -84,20 +82,53 @@ const buildCoolModalConfig = (params: any): CoolModalConfigOptions => ({
   scrollEnabled: params.scrollEnabled,
   single: params.single,
   springDamping: params.springDamping || 0.8,
-  startFromShortForm:
-    params.startFromShortForm || params?.type === 'token' || false,
-  topOffset:
-    params.topOffset === 0 ? 0 : params.topOffset || sharedCoolModalTopOffset,
+  startFromShortForm: params.startFromShortForm || params?.type === 'token' || false,
+  topOffset: params.topOffset === 0 ? 0 : params.topOffset || sharedCoolModalTopOffset,
   transitionDuration: params.transitionDuration || 0.35,
 });
 
-const backupSheetSizes = {
-  long:
-    deviceUtils.dimensions.height +
-    safeAreaInsetValues.bottom +
-    sharedCoolModalTopOffset +
-    SheetHandleFixedToTopHeight,
-  short: 394,
+export const backupSheetSizes = {
+  long: IS_ANDROID
+    ? deviceUtils.dimensions.height - safeAreaInsetValues.top
+    : deviceUtils.dimensions.height + safeAreaInsetValues.bottom + sharedCoolModalTopOffset + SheetHandleFixedToTopHeight,
+  medium: 550,
+  short: 424,
+  check_identifier: 414,
+  shorter: 364,
+};
+
+export const getHeightForStep = (step: string) => {
+  switch (step) {
+    case WalletBackupStepTypes.create_cloud_backup:
+    case WalletBackupStepTypes.restore_from_backup:
+      return backupSheetSizes.long;
+    case WalletBackupStepTypes.backup_prompt:
+      return backupSheetSizes.medium;
+    case WalletBackupStepTypes.check_identifier:
+      return backupSheetSizes.check_identifier;
+    default:
+      return backupSheetSizes.short;
+  }
+};
+
+export const checkIdentifierSheetConfig: PartialNavigatorConfigOptions = {
+  options: ({ navigation, route }) => {
+    const { params: { longFormHeight, step, ...params } = {} } = route as {
+      params: any;
+    };
+
+    const heightForStep = getHeightForStep(step);
+    if (longFormHeight !== heightForStep) {
+      navigation.setParams({
+        longFormHeight: heightForStep,
+      });
+    }
+
+    return buildCoolModalConfig({
+      ...params,
+      longFormHeight: heightForStep,
+    });
+  },
 };
 
 export const backupSheetConfig: PartialNavigatorConfigOptions = {
@@ -106,21 +137,7 @@ export const backupSheetConfig: PartialNavigatorConfigOptions = {
       params: any;
     };
 
-    let heightForStep = backupSheetSizes.short;
-    if (
-      step === WalletBackupStepTypes.cloud ||
-      step === WalletBackupStepTypes.manual
-    ) {
-      heightForStep = backupSheetSizes.long;
-    } else if (
-      // on the "existing_user" step, our "description" text is 1 extra line of text
-      // vertically, so we want to increase the sheet height by 1 lineHeight here
-      step === WalletBackupStepTypes.existing_user
-    ) {
-      // TODO: measure this text programatically
-      heightForStep = backupSheetSizes.short + fonts.lineHeight.looser;
-    }
-
+    const heightForStep = getHeightForStep(step);
     if (longFormHeight !== heightForStep) {
       navigation.setParams({
         longFormHeight: heightForStep,
@@ -185,7 +202,111 @@ export const nftSingleOfferSheetConfig = {
   }) => ({
     ...buildCoolModalConfig({
       ...params,
-      longFormHeight: longFormHeight || 0,
+      longFormHeight: longFormHeight || -1 * safeAreaInsetValues.bottom,
+    }),
+  }),
+};
+
+export const appIconUnlockSheetConfig = {
+  options: ({
+    route: {
+      params: { longFormHeight, ...params },
+    },
+  }: {
+    route: { params: any };
+  }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      longFormHeight: longFormHeight || -1 * safeAreaInsetValues.bottom,
+    }),
+  }),
+};
+
+export const mintsSheetConfig = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 1,
+      scrollEnabled: true,
+    }),
+  }),
+};
+
+export const consoleSheetConfig = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 1,
+      cornerRadius: 0,
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
+    }),
+  }),
+};
+
+export const networkSelectorConfig = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundColor: '#000000B2',
+      backgroundOpacity: 0.7,
+      cornerRadius: 0,
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
+    }),
+  }),
+};
+
+export const panelConfig = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 0.7,
+      cornerRadius: 0,
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
+    }),
+  }),
+};
+
+export const expandedAssetSheetV2Config = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 1,
+      cornerRadius: 'device',
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
+    }),
+  }),
+};
+
+export const swapConfig = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 0.9,
+      cornerRadius: 0,
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
+    }),
+  }),
+};
+
+export const signTransactionSheetConfig = {
+  options: ({ route }: { route: SignTransactionSheetRouteProp }) => ({
+    ...buildCoolModalConfig({
+      ...route.params,
+      backgroundOpacity: [RequestSource.WALLETCONNECT, RequestSource.MOBILE_WALLET_PROTOCOL].includes(route?.params?.source) ? 1 : 0.7,
+      cornerRadius: 0,
+      springDamping: 1,
+      topOffset: 0,
+      transitionDuration: 0.3,
     }),
   }),
 };
@@ -208,15 +329,6 @@ export const customGasSheetConfig: PartialNavigatorConfigOptions = {
       backgroundOpacity: 1,
       springDamping: 1,
       transitionDuration: 0.25,
-    }),
-  }),
-};
-
-export const addTokenSheetConfig: PartialNavigatorConfigOptions = {
-  options: ({ route: { params = {} } }) => ({
-    ...buildCoolModalConfig({
-      ...params,
-      longFormHeight: 394,
     }),
   }),
 };
@@ -246,6 +358,17 @@ export const sendConfirmationSheetConfig = {
 };
 
 export const settingsSheetConfig: PartialNavigatorConfigOptions = {
+  options: ({ route: { params = {} } }) => ({
+    ...buildCoolModalConfig({
+      ...params,
+      backgroundOpacity: 1,
+      scrollEnabled: false,
+      springDamping: 1,
+    }),
+  }),
+};
+
+export const recieveModalSheetConfig: PartialNavigatorConfigOptions = {
   options: ({ route: { params = {} } }) => ({
     ...buildCoolModalConfig({
       ...params,
@@ -392,16 +515,12 @@ export const ensAdditionalRecordsSheetConfig: PartialNavigatorConfigOptions = {
 };
 
 export const explainSheetConfig: PartialNavigatorConfigOptions = {
-  options: ({
-    route: { params = { network: getNetworkObj(networkTypes.mainnet).name } },
-  }) => {
+  options: ({ route: { params = { network: useBackendNetworksStore.getState().getChainsName()[ChainId.mainnet] } } }) => {
     // @ts-ignore
     const explainerConfig = explainers(params.network)[params?.type];
     return buildCoolModalConfig({
       ...params,
-      longFormHeight:
-        ExplainSheetHeight +
-        (explainerConfig?.extraHeight ? explainerConfig?.extraHeight : 0),
+      longFormHeight: ExplainSheetHeight + (explainerConfig?.extraHeight ? explainerConfig?.extraHeight : 0),
     });
   },
 };
@@ -420,6 +539,8 @@ export const expandedAssetSheetConfig: PartialNavigatorConfigOptions = {
     ...buildCoolModalConfig({
       ...params,
       scrollEnabled: true,
+      springDamping: 1,
+      transitionDuration: 0.28,
     }),
   }),
 };
@@ -429,6 +550,8 @@ export const expandedAssetSheetConfigWithLimit: PartialNavigatorConfigOptions = 
     ...buildCoolModalConfig({
       ...params,
       scrollEnabled: true,
+      springDamping: 1,
+      transitionDuration: 0.28,
     }),
     limitActiveModals: true,
   }),
@@ -439,7 +562,7 @@ export const restoreSheetConfig: PartialNavigatorConfigOptions = {
   options: ({ route: { params: { longFormHeight, ...params } = {} } }) => ({
     ...buildCoolModalConfig({
       ...params,
-      longFormHeight,
+      height: backupSheetSizes.long,
     }),
   }),
 };
@@ -473,6 +596,7 @@ export const stackNavigationConfig = {
 export const defaultScreenStackOptions: StackNavigationOptions = {
   animationTypeForReplace: 'pop',
   gestureEnabled: true,
+  presentation: 'transparentModal',
 };
 
 export const closeKeyboardOnClose = {
@@ -503,26 +627,6 @@ export const nativeStackDefaultConfigWithoutStatusBar: CoolModalConfigOptions = 
   },
 };
 
-export const exchangeTabNavigatorConfig = {
-  initialLayout: deviceUtils.dimensions,
-  sceneContainerStyle: {
-    backgroundColor: 'transparent',
-  },
-  springConfig: {
-    damping: 30,
-    mass: 1,
-    overshootClamping: false,
-    restDisplacementThreshold: 0.01,
-    restSpeedThreshold: 0.01,
-    stiffness: 300,
-  },
-  swipeDistanceMinimum: 0,
-  swipeVelocityImpact: 1,
-  swipeVelocityScale: 1,
-  tabBar: () => null,
-  transparentCard: true,
-};
-
 const BackArrow = styled(Icon).attrs({
   color: colors.themedColors?.appleBlue,
   direction: 'left',
@@ -530,7 +634,7 @@ const BackArrow = styled(Icon).attrs({
 })({
   marginLeft: 15,
   marginRight: 5,
-  marginTop: android ? 2 : 0.5,
+  marginTop: android ? 12 : 0.5,
 });
 
 const BackImage = () => <BackArrow />;
@@ -538,9 +642,8 @@ const BackImage = () => <BackArrow />;
 const headerConfigOptions = {
   headerBackTitleStyle: {
     fontFamily: fonts.family.SFProRounded,
-    // @ts-ignore
-    fontSize: parseFloat(fonts.size.large),
-    fontWeight: fonts.weight.medium,
+    fontSize: Number(fonts.size.large),
+    fontWeight: fonts.weight.medium as any,
     letterSpacing: fonts.letterSpacing.roundedMedium,
   },
   headerLeftContainerStyle: {
@@ -556,61 +659,53 @@ const headerConfigOptions = {
     headerTitleAlign: 'center',
   }),
   headerTitleStyle: {
-    color: colors.themedColors?.dark,
+    color: colors.themedColors?.dark ?? 'black',
     fontFamily: fonts.family.SFProRounded,
-    // @ts-ignore
-    fontSize: parseFloat(fonts.size.large),
-    fontWeight: fonts.weight.heavy,
+    fontSize: Number(fonts.size.large),
+    fontWeight: fonts.weight.heavy as any,
     letterSpacing: fonts.letterSpacing.roundedMedium,
   },
 };
-
-// @ts-expect-error Styled Thing types are incomplete
-const EmptyButtonPlaceholder = styled.View({
-  flex: 1,
-});
 
 const SettingsTitle = ({ children }: React.PropsWithChildren) => {
   const { colors } = useTheme();
 
   return (
-    <Text
-      align="center"
-      color={colors.dark}
-      letterSpacing="roundedMedium"
-      size="large"
-      weight="bold"
-    >
-      {children}
-    </Text>
+    <Box paddingTop={IS_ANDROID ? '8px' : undefined}>
+      <Text align="center" color={colors.dark} letterSpacing="roundedMedium" size="large" weight="heavy">
+        {children}
+      </Text>
+    </Box>
   );
 };
 
-export const settingsOptions = (colors: any) => ({
+export const settingsOptions = (colors: any, isSettingsRoute = true): StackNavigationOptions => ({
   ...headerConfigOptions,
+  headerTitleAlign: 'center',
   cardShadowEnabled: false,
   cardStyle: {
     backgroundColor: colors.cardBackdrop,
     overflow: 'visible',
   },
-  gestureEnabled: ios,
-  gestureResponseDistance: { horizontal: deviceUtils.dimensions.width },
-  ...(ios && { headerBackImage: BackImage }),
+  gestureEnabled: true,
   headerBackTitle: ' ',
   headerStatusBarHeight: 0,
-  headerStyle: {
-    backgroundColor: ios ? colors.cardBackdrop : 'transparent',
-    elevation: 0,
-    height: 60,
-    shadowColor: 'transparent',
-  },
-  headerTitleStyle: {
-    ...headerConfigOptions.headerTitleStyle,
-    color: colors.dark,
-  },
-  ...(android && {
-    headerLeft: (props: any) => <BackButton {...props} textChevron />,
-    headerRight: () => <EmptyButtonPlaceholder />,
-    headerTitle: (props: any) => <SettingsTitle {...props} />,
-  }),
+  ...(isSettingsRoute
+    ? {
+        headerStyle: {
+          backgroundColor: colors.cardBackdrop,
+          elevation: 0,
+          height: 60,
+          shadowColor: 'transparent',
+        },
+        headerBackImage: BackImage,
+      }
+    : {
+        headerStyle: {
+          backgroundColor: colors.transparent,
+          height: 0,
+        },
+        headerBackImage: () => <></>,
+      }),
+  headerTitle: (props: any) => <SettingsTitle {...props} />,
 });

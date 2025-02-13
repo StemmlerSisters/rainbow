@@ -72,28 +72,17 @@ it('updatePrecisionToDisplay1', () => {
 });
 
 it('updatePrecisionToDisplay1RoundUp', () => {
-  const result = updatePrecisionToDisplay(
-    '0.00000000123',
-    '0.1234987234',
-    true
-  );
+  const result = updatePrecisionToDisplay('0.00000000123', '0.1234987234', true);
   expect(result).toBe('0.000000002');
 });
 
 it('updatePrecisionToDisplay2', () => {
-  const result = updatePrecisionToDisplay(
-    '0.17987196800000002',
-    '0.1234987234'
-  );
+  const result = updatePrecisionToDisplay('0.17987196800000002', '0.1234987234');
   expect(result).toBe('0.179');
 });
 
 it('updatePrecisionToDisplay2RoundUp', () => {
-  const result = updatePrecisionToDisplay(
-    '0.17987196800000002',
-    '0.1234987234',
-    true
-  );
+  const result = updatePrecisionToDisplay('0.17987196800000002', '0.1234987234', true);
   expect(result).toBe('0.18');
 });
 
@@ -140,6 +129,11 @@ it('updatePrecisionToDisplay6RoundUp', () => {
 it('addDisplay', () => {
   const result = addDisplay('$150.50', '$912.21');
   expect(result).toBe('$1,062.71');
+});
+
+it('addDisplay with large numbers', () => {
+  const result = addDisplay('$1,002,000.50', '$13,912.21');
+  expect(result).toBe('$1,015,912.71');
 });
 
 it('addDisplay with left-aligned currency', () => {

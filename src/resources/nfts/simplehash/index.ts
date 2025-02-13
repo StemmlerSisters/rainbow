@@ -1,16 +1,10 @@
 import { NFT_API_KEY, NFT_API_URL } from 'react-native-dotenv';
 import { RainbowFetchClient } from '@/rainbow-fetch';
-import { Network } from '@/helpers';
-import { getSimpleHashChainFromNetwork } from '@/resources/nfts/simplehash/utils';
-import {
-  SimpleHashChain,
-  SimpleHashListing,
-  SimpleHashNFT,
-  SimpleHashMarketplaceId,
-} from '@/resources/nfts/simplehash/types';
-import { RainbowNetworks } from '@/networks';
+import { SimpleHashListing, SimpleHashNFT, SimpleHashMarketplaceId } from '@/resources/nfts/simplehash/types';
 import { UniqueAsset } from '@/entities';
 import { RainbowError, logger } from '@/logger';
+import { ChainId } from '@/state/backendNetworks/types';
+import { useBackendNetworksStore } from '@/state/backendNetworks/backendNetworks';
 
 export const START_CURSOR = 'start';
 
@@ -18,75 +12,51 @@ const nftApi = new RainbowFetchClient({
   baseURL: `https://${NFT_API_URL}/api/v0`,
 });
 
-const createCursorSuffix = (cursor: string) =>
-  cursor === START_CURSOR ? '' : `&cursor=${cursor}`;
+const createCursorSuffix = (cursor: string) => (cursor === START_CURSOR ? '' : `&cursor=${cursor}`);
 
 export async function fetchSimpleHashNFT(
   contractAddress: string,
   tokenId: string,
-  network: Omit<Network, Network.goerli> = Network.mainnet
+  chainId: Omit<ChainId, ChainId.goerli> = ChainId.mainnet
 ): Promise<SimpleHashNFT | undefined> {
-  const chain = getSimpleHashChainFromNetwork(network);
+  const simplehashNetwork = useBackendNetworksStore.getState().getChainsSimplehashNetwork()[chainId as ChainId];
 
-  if (!chain) {
-    throw new Error(
-      `fetchSimpleHashNFT: no SimpleHash chain for network: ${network}`
-    );
+  if (!simplehashNetwork) {
+    logger.warn(`[simplehash]: no SimpleHash for chainId: ${chainId}`);
+    return;
   }
 
-  const response = await nftApi.get(
-    `/nfts/${chain}/${contractAddress}/${tokenId}`,
-    {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'x-api-key': NFT_API_KEY,
-      },
-    }
-  );
+  const response = await nftApi.get(`/nfts/${simplehashNetwork}/${contractAddress}/${tokenId}`, {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'x-api-key': NFT_API_KEY,
+    },
+  });
   return response?.data;
-}
-
-export async function fetchSimpleHashNFTs(
-  walletAddress: string,
-  cursor: string = START_CURSOR
-): Promise<{ data: SimpleHashNFT[]; nextCursor: string | null }> {
-  const chainsParam = RainbowNetworks.filter(network => network.features.nfts)
-    .map(network => network.nfts?.simplehashNetwork || network.value)
-    .join(',');
-  const cursorSuffix = createCursorSuffix(cursor);
-  const response = await nftApi.get(
-    `/nfts/owners?chains=${chainsParam}&wallet_addresses=${walletAddress}${cursorSuffix}`,
-    {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'x-api-key': NFT_API_KEY,
-      },
-    }
-  );
-  return {
-    data: response?.data?.nfts ?? [],
-    nextCursor: response?.data?.next_cursor,
-  };
 }
 
 export async function fetchSimpleHashNFTListing(
   contractAddress: string,
   tokenId: string,
-  network: Omit<Network, Network.goerli> = Network.mainnet
+  chainId: Omit<ChainId, ChainId.goerli> = ChainId.mainnet
 ): Promise<SimpleHashListing | undefined> {
   // array of all eth listings on OpenSea for this token
   let listings: SimpleHashListing[] = [];
   let cursor = START_CURSOR;
-  const chain = getSimpleHashChainFromNetwork(network);
+  const simplehashNetwork = useBackendNetworksStore.getState().getChainsSimplehashNetwork()[chainId as ChainId];
+
+  if (!simplehashNetwork) {
+    logger.warn(`[simplehash]: no SimpleHash for chainId: ${chainId}`);
+    return;
+  }
 
   while (cursor) {
     const cursorSuffix = createCursorSuffix(cursor);
     // eslint-disable-next-line no-await-in-loop
     const response = await nftApi.get(
       // OpenSea ETH offers only for now
-      `/nfts/listings/${chain}/${contractAddress}/${tokenId}?marketplaces=${SimpleHashMarketplaceId.OpenSea}${cursorSuffix}`,
+      `/nfts/listings/${simplehashNetwork}/${contractAddress}/${tokenId}?marketplaces=${SimpleHashMarketplaceId.OpenSea}${cursorSuffix}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -99,16 +69,11 @@ export async function fetchSimpleHashNFTListing(
     // aggregate array of eth listings on OpenSea
     listings = [
       ...listings,
-      response?.data?.listings?.find(
-        (listing: SimpleHashListing) =>
-          listing?.payment_token?.payment_token_id === 'ethereum.native'
-      ),
+      response?.data?.listings?.find((listing: SimpleHashListing) => listing?.payment_token?.payment_token_id === 'ethereum.native'),
     ];
   }
   // cheapest eth listing
-  const cheapestListing = listings.reduce((prev, curr) =>
-    curr.price < prev.price ? curr : prev
-  );
+  const cheapestListing = listings.reduce((prev, curr) => (curr.price < prev.price ? curr : prev));
   return cheapestListing;
 }
 
@@ -118,21 +83,16 @@ export async function fetchSimpleHashNFTListing(
  * @param nft
  */
 export async function refreshNFTContractMetadata(nft: UniqueAsset) {
-  const chain = nft.isPoap
-    ? SimpleHashChain.Gnosis
-    : getSimpleHashChainFromNetwork(nft.network);
+  const simplehashNetwork = useBackendNetworksStore.getState().getChainsSimplehashNetwork()[nft.isPoap ? ChainId.gnosis : nft.chainId];
 
-  if (!chain) {
-    logger.error(
-      new RainbowError(
-        `refreshNFTContractMetadata: no SimpleHash chain for network: ${nft.network}`
-      )
-    );
+  if (!simplehashNetwork) {
+    logger.warn(`[simplehash]: no SimpleHash for chainId: ${nft.chainId}`);
+    return;
   }
 
   try {
     await nftApi.post(
-      `/nfts/refresh/${chain}/${nft.asset_contract.address}`,
+      `/nfts/refresh/${simplehashNetwork}/${nft.asset_contract.address}`,
       {},
       {
         headers: {
@@ -144,13 +104,13 @@ export async function refreshNFTContractMetadata(nft: UniqueAsset) {
     );
   } catch {
     logger.warn(
-      `refreshNFTContractMetadata: failed to refresh metadata for NFT contract ${nft.asset_contract.address}, falling back to refreshing NFT #${nft.id}`
+      `[simplehash]: failed to refresh metadata for NFT contract ${nft.asset_contract.address}, falling back to refreshing NFT #${nft.id}`
     );
     try {
       // If the collection has > 20k NFTs, the above request will fail.
       // In that case, we need to refresh the given NFT individually.
       await nftApi.post(
-        `/nfts/refresh/${chain}/${nft.asset_contract.address}/${nft.id}`,
+        `/nfts/refresh/${simplehashNetwork}/${nft.asset_contract.address}/${nft.id}`,
         {},
         {
           headers: {
@@ -163,9 +123,43 @@ export async function refreshNFTContractMetadata(nft: UniqueAsset) {
     } catch {
       logger.error(
         new RainbowError(
-          `refreshNFTContractMetadata: failed to refresh metadata for NFT #${nft.id} after failing to refresh metadata for NFT contract ${nft.asset_contract.address}`
+          `[simplehash]: failed to refresh metadata for NFT #${nft.id} after failing to refresh metadata for NFT contract ${nft.asset_contract.address}`
         )
       );
     }
+  }
+}
+
+/**
+ * Report an nft as spam to SimpleHash
+ * @param nft
+ */
+export async function reportNFT(nft: UniqueAsset) {
+  const simplehashNetwork = useBackendNetworksStore.getState().getChainsSimplehashNetwork()[nft.isPoap ? ChainId.gnosis : nft.chainId];
+
+  if (!simplehashNetwork) {
+    logger.warn(`[simplehash]: no SimpleHash for chainId: ${nft.chainId}`);
+    return;
+  }
+
+  try {
+    await nftApi.post(
+      '/nfts/report/spam',
+      {
+        contract_address: nft.asset_contract.address,
+        chain_id: simplehashNetwork,
+        token_id: nft.id,
+        event_type: 'mark_as_spam',
+      },
+      {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'x-api-key': NFT_API_KEY,
+        },
+      }
+    );
+  } catch {
+    logger.error(new RainbowError(`[simplehash]: failed to report NFT ${nft.asset_contract.address} #${nft.id} as spam to SimpleHash`));
   }
 }

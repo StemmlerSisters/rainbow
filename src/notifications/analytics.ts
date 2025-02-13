@@ -1,21 +1,19 @@
-import { analytics } from '@/analytics';
+import { analytics, analyticsV2 } from '@/analytics';
 import { MinimalNotification } from '@/notifications/types';
 import { getPermissionStatus } from '@/notifications/permissions';
 import messaging from '@react-native-firebase/messaging';
 import {
-  NotificationRelationship,
+  WalletNotificationRelationship,
   WALLET_GROUPS_STORAGE_KEY,
   WALLET_TOPICS_STORAGE_KEY,
   GroupSettings,
-  NotificationRelationshipType,
-  NotificationTopicType,
+  WalletNotificationRelationshipType,
+  GlobalNotificationTopicType,
   WalletNotificationSettings,
   notificationSettingsStorage,
 } from '@/notifications/settings';
 
-export const trackTappedPushNotification = (
-  notification: MinimalNotification | undefined
-) => {
+export const trackTappedPushNotification = (notification: MinimalNotification | undefined) => {
   analytics.track('Tapped Push Notification', {
     campaign: {
       name: notification?.data?.type ?? 'default',
@@ -24,24 +22,15 @@ export const trackTappedPushNotification = (
   });
 };
 
-export const trackChangedNotificationSettings = (
-  chainId: number,
-  topic: NotificationTopicType,
-  type: NotificationRelationshipType,
-  action: 'subscribe' | 'unsubscribe'
-) => {
-  analytics.track('Changed Notification Settings', {
-    chainId,
+export const trackChangedGlobalNotificationSettings = (topic: GlobalNotificationTopicType, enableTopic: boolean) => {
+  analytics.track('Changed Global Notification Settings', {
     topic,
-    type,
-    action,
+    action: enableTopic ? 'subscribe' : 'unsubscribe',
   });
 };
 
-export const trackPushNotificationPermissionStatus = (
-  status: PushNotificationPermissionStatus
-) => {
-  analytics.identify(undefined, { notificationsPermissionStatus: status });
+export const trackPushNotificationPermissionStatus = async (status: PushNotificationPermissionStatus) => {
+  analyticsV2.identify({ notificationsPermissionStatus: status });
 };
 
 type PushNotificationPermissionStatus = 'enabled' | 'disabled' | 'never asked';
@@ -50,10 +39,7 @@ export const resolveAndTrackPushNotificationPermissionStatus = async () => {
   const permissionStatus = await getPermissionStatus();
   let statusToReport: PushNotificationPermissionStatus = 'never asked';
 
-  if (
-    permissionStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-    permissionStatus === messaging.AuthorizationStatus.PROVISIONAL
-  ) {
+  if (permissionStatus === messaging.AuthorizationStatus.AUTHORIZED || permissionStatus === messaging.AuthorizationStatus.PROVISIONAL) {
     statusToReport = 'enabled';
   } else if (permissionStatus === messaging.AuthorizationStatus.DENIED) {
     statusToReport = 'disabled';
@@ -63,25 +49,19 @@ export const resolveAndTrackPushNotificationPermissionStatus = async () => {
 };
 
 export const trackWalletsSubscribedForNotifications = () => {
-  const walletsStringValue = notificationSettingsStorage.getString(
-    WALLET_TOPICS_STORAGE_KEY
-  );
-  const groupsStringValue = notificationSettingsStorage.getString(
-    WALLET_GROUPS_STORAGE_KEY
-  );
+  const walletsStringValue = notificationSettingsStorage.getString(WALLET_TOPICS_STORAGE_KEY);
+  const groupsStringValue = notificationSettingsStorage.getString(WALLET_GROUPS_STORAGE_KEY);
 
   if (!walletsStringValue || !groupsStringValue) return;
 
-  const wallets = JSON.parse(
-    walletsStringValue
-  ) as WalletNotificationSettings[];
+  const wallets = JSON.parse(walletsStringValue) as WalletNotificationSettings[];
   const groups = JSON.parse(groupsStringValue) as GroupSettings;
 
   const { imported, watched } = countWalletsWithNotificationsTurnedOn(wallets);
 
   trackNumberOfWalletsWithNotificationsTurnedOn(
-    groups[NotificationRelationship.OWNER] ? imported : 0,
-    groups[NotificationRelationship.WATCHER] ? watched : 0
+    groups[WalletNotificationRelationship.OWNER] ? imported : 0,
+    groups[WalletNotificationRelationship.WATCHER] ? watched : 0
   );
 };
 
@@ -108,9 +88,7 @@ export const registerNotificationSubscriptionChangesListener = (): NotificationS
 };
 
 const onGroupStateChange = (state: GroupSettings) => {
-  const stringValue = notificationSettingsStorage.getString(
-    WALLET_TOPICS_STORAGE_KEY
-  );
+  const stringValue = notificationSettingsStorage.getString(WALLET_TOPICS_STORAGE_KEY);
 
   if (!stringValue) return;
 
@@ -118,8 +96,8 @@ const onGroupStateChange = (state: GroupSettings) => {
   const { imported, watched } = countWalletsWithNotificationsTurnedOn(wallets);
 
   trackNumberOfWalletsWithNotificationsTurnedOn(
-    state[NotificationRelationship.OWNER] ? imported : 0,
-    state[NotificationRelationship.WATCHER] ? watched : 0
+    state[WalletNotificationRelationship.OWNER] ? imported : 0,
+    state[WalletNotificationRelationship.WATCHER] ? watched : 0
   );
 };
 
@@ -129,15 +107,13 @@ const onTopicsStateChange = (state: WalletNotificationSettings[]) => {
   trackNumberOfWalletsWithNotificationsTurnedOn(imported, watched);
 };
 
-const countWalletsWithNotificationsTurnedOn = (
-  wallets: WalletNotificationSettings[]
-) => {
+const countWalletsWithNotificationsTurnedOn = (wallets: WalletNotificationSettings[]) => {
   let imported = 0;
   let watched = 0;
 
   wallets.forEach(entry => {
     if (!entry.enabled) return;
-    if (entry.type === NotificationRelationship.OWNER) imported += 1;
+    if (entry.type === WalletNotificationRelationship.OWNER) imported += 1;
     else watched += 1;
   });
 
@@ -147,11 +123,8 @@ const countWalletsWithNotificationsTurnedOn = (
   };
 };
 
-const trackNumberOfWalletsWithNotificationsTurnedOn = (
-  imported: number,
-  watched: number
-) => {
-  analytics.identify(undefined, {
+const trackNumberOfWalletsWithNotificationsTurnedOn = async (imported: number, watched: number) => {
+  analyticsV2.identify({
     numberOfImportedWalletsWithNotificationsTurnedOn: imported,
     numberOfWatchedWalletsWithNotificationsTurnedOn: watched,
   });

@@ -2,7 +2,6 @@ import lang from 'i18n-js';
 import { startCase } from 'lodash';
 import React from 'react';
 import { View } from 'react-native';
-import { IS_TESTING } from 'react-native-dotenv';
 import { ContextMenuButton } from 'react-native-ios-context-menu';
 import RadialGradient from 'react-native-radial-gradient';
 import { ButtonPressAnimation } from './animations';
@@ -12,13 +11,8 @@ import { Text } from './text';
 import { useClipboard } from '@/hooks';
 import styled from '@/styled-thing';
 import { fonts, fontWithWidth, padding } from '@/styles';
-
-import {
-  abbreviations,
-  ethereumUtils,
-  haptics,
-  showActionSheetWithOptions,
-} from '@/utils';
+import { IS_TEST } from '@/env';
+import { abbreviations, ethereumUtils, haptics, showActionSheetWithOptions } from '@/utils';
 
 const InfoButton = styled(Centered)({
   alignItems: 'center',
@@ -32,12 +26,10 @@ const InfoButton = styled(Centered)({
   ...padding.object(0, 0),
 });
 
-const Circle = styled(IS_TESTING === 'true' ? View : RadialGradient).attrs(
-  ({ theme: { colors } }) => ({
-    center: [0, 15],
-    colors: colors.gradients.lightestGrey,
-  })
-)({
+const Circle = styled(IS_TEST ? View : RadialGradient).attrs(({ theme: { colors } }) => ({
+  center: [0, 15],
+  colors: colors.gradients.lightestGrey,
+}))({
   borderRadius: 15,
   height: 30,
   margin: 10,
@@ -74,9 +66,9 @@ const ContactRowActions = {
   },
 };
 
-const buildBlockExplorerAction = type => {
+const buildBlockExplorerAction = chainId => {
   const blockExplorerText = lang.t('wallet.action.view_on', {
-    blockExplorerName: startCase(ethereumUtils.getBlockExplorer(type)),
+    blockExplorerName: startCase(ethereumUtils.getBlockExplorer({ chainId })),
   });
 
   return {
@@ -89,7 +81,7 @@ const buildBlockExplorerAction = type => {
   };
 };
 
-const ContactRowInfoButton = ({ children, item, network, scaleTo }) => {
+const ContactRowInfoButton = ({ children, item, chainId, scaleTo }) => {
   const { setClipboard } = useClipboard();
   const handleCopyAddress = useCallback(
     address => {
@@ -100,14 +92,8 @@ const ContactRowInfoButton = ({ children, item, network, scaleTo }) => {
   );
 
   const onPressAndroid = useCallback(() => {
-    const blockExplorerText = `View on ${startCase(
-      ethereumUtils.getBlockExplorer(item?.type)
-    )}`;
-    const androidContractActions = [
-      lang.t('wallet.action.copy_contract_address'),
-      blockExplorerText,
-      lang.t('button.cancel'),
-    ];
+    const blockExplorerText = `View on ${startCase(ethereumUtils.getBlockExplorer({ chainId }))}`;
+    const androidContractActions = [lang.t('wallet.action.copy_contract_address'), blockExplorerText, lang.t('button.cancel')];
     showActionSheetWithOptions(
       {
         cancelButtonIndex: 2,
@@ -120,37 +106,35 @@ const ContactRowInfoButton = ({ children, item, network, scaleTo }) => {
           handleCopyAddress(item?.address);
         }
         if (idx === 1) {
-          ethereumUtils.openAddressInBlockExplorer(item?.address, network);
+          ethereumUtils.openAddressInBlockExplorer({ address: item?.address, chainId });
         }
       }
     );
-  }, [item?.type, item?.name, item?.address, handleCopyAddress, network]);
+  }, [item?.name, item?.address, handleCopyAddress, chainId]);
 
   const menuConfig = useMemo(() => {
-    const blockExplorerAction = buildBlockExplorerAction(item?.type);
+    const blockExplorerAction = buildBlockExplorerAction(chainId);
     return {
       menuItems: [
         blockExplorerAction,
         {
           ...ContactRowActions[ContactRowActionsEnum.copyAddress],
-          discoverabilityTitle: abbreviations.formatAddressForDisplay(
-            item?.address
-          ),
+          discoverabilityTitle: abbreviations.formatAddressForDisplay(item?.address),
         },
       ],
       menuTitle: `${item?.name}`,
     };
-  }, [item]);
+  }, [chainId, item?.address, item?.name]);
 
   const handlePressMenuItem = useCallback(
     ({ nativeEvent: { actionKey } }) => {
       if (actionKey === ContactRowActionsEnum.copyAddress) {
         handleCopyAddress(item?.address);
       } else if (actionKey === ContactRowActionsEnum.blockExplorer) {
-        ethereumUtils.openAddressInBlockExplorer(item?.address);
+        ethereumUtils.openAddressInBlockExplorer({ address: item?.address, chainId });
       }
     },
-    [item, handleCopyAddress]
+    [handleCopyAddress, item?.address, chainId]
   );
 
   const Container = children ? Centered : InfoButton;

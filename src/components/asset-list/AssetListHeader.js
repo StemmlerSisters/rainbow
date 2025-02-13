@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { IS_TESTING } from 'react-native-dotenv';
 import LinearGradient from 'react-native-linear-gradient';
-import { useSelector } from 'react-redux';
 import { abbreviations, magicMemo, measureText } from '../../utils';
-import { DividerSize } from '../Divider';
 import { ButtonPressAnimation } from '../animations';
 import { Icon } from '../icons';
 import { Centered, Row } from '../layout';
@@ -17,8 +14,11 @@ import Routes from '@/navigation/routesNames';
 import styled from '@/styled-thing';
 import { fonts, position } from '@/styles';
 import { useTheme } from '@/theme';
+import * as lang from '@/languages';
+import { useUserAssetsStore } from '@/state/assets/userAssets';
+import { IS_TEST } from '@/env';
 
-export const AssetListHeaderHeight = ListHeaderHeight + DividerSize;
+export const AssetListHeaderHeight = ListHeaderHeight;
 
 const dropdownArrowWidth = 30;
 const placeholderWidth = 120;
@@ -54,13 +54,7 @@ const TotalAmountSkeleton = styled(Skeleton)({
   justifyContent: 'center',
 });
 
-const WalletSelectButton = ({
-  accountName,
-  onChangeWallet,
-  deviceWidth,
-  textWidth,
-  maxWidth,
-}) => {
+const WalletSelectButton = ({ accountName, onChangeWallet, deviceWidth, textWidth, maxWidth }) => {
   const { colors } = useTheme();
 
   const truncated = textWidth > maxWidth - 6;
@@ -88,7 +82,7 @@ const WalletSelectButton = ({
         </AccountName>
         {truncatedAccountName ? (
           <DropdownArrow>
-            {IS_TESTING !== 'true' && (
+            {!IS_TEST && (
               <LinearGradient
                 borderRadius={15}
                 colors={colors.gradients.lightestGrey}
@@ -106,17 +100,11 @@ const WalletSelectButton = ({
   );
 };
 
-const AssetListHeader = ({
-  contextMenuOptions,
-  isCoinListEdited,
-  title,
-  totalValue,
-  ...props
-}) => {
+const AssetListHeader = ({ contextMenuOptions, isCoinListEdited, title, totalValue, isSticky = true, ...props }) => {
   const { width: deviceWidth } = useDimensions();
   const { accountName } = useAccountProfile();
   const { navigate } = useNavigation();
-  const isLoadingAssets = useSelector(state => state.data.isLoadingAssets);
+  const isLoadingUserAssets = useUserAssetsStore(state => state.getStatus().isInitialLoading);
 
   const onChangeWallet = useCallback(() => {
     navigate(Routes.CHANGE_WALLET_SHEET);
@@ -124,9 +112,7 @@ const AssetListHeader = ({
 
   const [textWidth, setTextWidth] = useState(0);
 
-  const amountWidth = isLoadingAssets
-    ? placeholderWidth + 16
-    : totalValue?.length * 15;
+  const amountWidth = isLoadingUserAssets ? placeholderWidth + 16 : totalValue?.length * 15;
   const maxWidth = deviceWidth - dropdownArrowWidth - amountWidth - 32;
 
   useEffect(() => {
@@ -141,13 +127,14 @@ const AssetListHeader = ({
     measure();
   }, [accountName]);
 
-  return (
-    <StickyHeader name={title}>
+  const children = useMemo(() => {
+    return (
       <ListHeader
         contextMenuOptions={contextMenuOptions}
         isCoinListEdited={isCoinListEdited}
         title={title}
         totalValue={totalValue}
+        // eslint-disable-next-line react/jsx-props-no-spreading
         {...props}
       >
         {!title && (
@@ -161,7 +148,7 @@ const AssetListHeader = ({
             />
           </WalletSelectButtonWrapper>
         )}
-        {isLoadingAssets && title !== 'Collectibles' ? (
+        {isLoadingUserAssets && title !== lang.t(lang.l.account.tab_collectibles) ? (
           <TotalAmountSkeleton>
             <FakeText height={16} width={placeholderWidth} />
           </TotalAmountSkeleton>
@@ -171,13 +158,26 @@ const AssetListHeader = ({
           </H1>
         ) : null}
       </ListHeader>
-    </StickyHeader>
-  );
+    );
+  }, [
+    accountName,
+    contextMenuOptions,
+    deviceWidth,
+    isCoinListEdited,
+    isLoadingUserAssets,
+    maxWidth,
+    onChangeWallet,
+    props,
+    textWidth,
+    title,
+    totalValue,
+  ]);
+
+  if (isSticky) {
+    return <StickyHeader name={title}>{children}</StickyHeader>;
+  }
+
+  return children;
 };
 
-export default magicMemo(AssetListHeader, [
-  'contextMenuOptions',
-  'isCoinListEdited',
-  'title',
-  'totalValue',
-]);
+export default magicMemo(AssetListHeader, ['contextMenuOptions', 'isCoinListEdited', 'title', 'totalValue']);

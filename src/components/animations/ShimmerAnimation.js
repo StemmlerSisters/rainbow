@@ -1,15 +1,9 @@
 import React, { useEffect, useMemo } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import styled from '@/styled-thing';
 import { position } from '@/styles';
-import { IS_TESTING } from 'react-native-dotenv';
+import { IS_TEST } from '@/env';
 
 const timingConfig = {
   duration: 2500,
@@ -23,9 +17,10 @@ const ColorGradient = styled(AnimatedLinearGradient).attrs({
 })(position.coverAsObject);
 
 export default function ShimmerAnimation({
+  animationDuration = timingConfig.duration,
   color,
   enabled = true,
-  gradientColor = undefined,
+  gradientColor = '',
   width = 0,
 }) {
   const opacity = useSharedValue(1);
@@ -33,30 +28,38 @@ export default function ShimmerAnimation({
   const { colors } = useTheme();
 
   const gradientColors = useMemo(
-    () => [
-      colors.alpha(color, 0),
-      gradientColor ?? colors.alpha(colors.whiteLabel, 0.2),
-      colors.alpha(color, 0),
-    ],
+    () => [colors.alpha(color, 0), gradientColor || colors.alpha(colors.whiteLabel, 0.2), colors.alpha(color, 0)],
     [gradientColor, color, colors]
   );
 
   useEffect(() => {
     if (enabled) {
-      opacity.value = withTiming(1, timingConfig);
-      positionX.value = withRepeat(withTiming(width * 1.5, timingConfig), -1);
+      opacity.value = withTiming(1, {
+        duration: animationDuration,
+        easing: timingConfig.easing,
+      });
+      positionX.value = withRepeat(
+        withTiming(width * 1.5, {
+          duration: animationDuration,
+          easing: timingConfig.easing,
+        }),
+        -1
+      );
     } else {
-      opacity.value = withTiming(0, timingConfig);
+      opacity.value = withTiming(0, {
+        duration: animationDuration,
+        easing: timingConfig.easing,
+      });
       positionX.value = -width * 1.5;
     }
-  }, [enabled, opacity, positionX, width]);
+  }, [animationDuration, enabled, opacity, positionX, width]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ translateX: positionX.value }],
   }));
 
-  if (IS_TESTING === 'true') {
+  if (IS_TEST) {
     return null;
   }
 

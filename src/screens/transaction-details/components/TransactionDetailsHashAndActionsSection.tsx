@@ -9,32 +9,27 @@ import { Box, Stack } from '@/design-system';
 import { useTheme } from '@/theme';
 import * as i18n from '@/languages';
 import { ButtonPressAnimation } from '@/components/animations';
-import Clipboard from '@react-native-community/clipboard';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { RainbowTransaction, TransactionStatus } from '@/entities';
-import { swapMetadataStorage } from '@/raps/actions/swap';
-import { SwapMetadata } from '@/raps/common';
+import { swapMetadataStorage } from '@/raps/common';
+import { SwapMetadata } from '@/raps/references';
 import { Navigation } from '@/navigation';
 import Routes from '@/navigation/routesNames';
 import { useSelector } from 'react-redux';
 import { AppState } from '@/redux/store';
 import WalletTypes from '@/helpers/walletTypes';
+import { Linking } from 'react-native';
 
 type Props = {
   transaction: RainbowTransaction;
   presentToast?: () => void;
 };
 
-export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({
-  transaction,
-  presentToast,
-}) => {
+export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({ transaction, presentToast }) => {
   const { colors } = useTheme();
   const hash = useMemo(() => ethereumUtils.getHash(transaction), [transaction]);
-  const { network, status } = transaction;
-  const isReadOnly = useSelector(
-    (state: AppState) =>
-      state.wallets.selected?.type === WalletTypes.readOnly ?? true
-  );
+  const { network, status, chainId } = transaction;
+  const isReadOnly = useSelector((state: AppState) => state.wallets.selected?.type === WalletTypes.readOnly);
   // Retry swap related data
   const retrySwapMetadata = useMemo(() => {
     const data = swapMetadataStorage.getString(hash ?? '');
@@ -45,18 +40,13 @@ export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({
     return undefined;
   }, [hash]);
 
-  const isRetrySwapButtonVisible =
-    !isReadOnly && status === TransactionStatus.failed && !!retrySwapMetadata;
+  const isRetrySwapButtonVisible = !isReadOnly && status === TransactionStatus.failed && !!retrySwapMetadata;
 
   const onRetrySwap = useCallback(() => {
     Navigation.handleAction(Routes.WALLET_SCREEN, {});
-    Navigation.handleAction(Routes.EXCHANGE_MODAL, {
-      params: {
-        meta: retrySwapMetadata,
-        inputAsset: retrySwapMetadata?.inputAsset,
-        outputAsset: retrySwapMetadata?.outputAsset,
-      },
-    });
+
+    // TODO: Add retry swap logic back for swaps
+    Navigation.handleAction(Routes.SWAP, {});
   }, [retrySwapMetadata]);
 
   if (!hash || !network) {
@@ -72,7 +62,11 @@ export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({
   const formattedHash = shortenTxHashString(hash);
 
   const onViewOnBlockExplorerPress = () => {
-    ethereumUtils.openTransactionInBlockExplorer(hash, network);
+    if (transaction.explorerUrl) {
+      Linking.openURL(transaction.explorerUrl);
+    } else {
+      ethereumUtils.openTransactionInBlockExplorer({ hash, chainId });
+    }
   };
 
   return (
@@ -83,11 +77,7 @@ export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({
           {formattedHash && (
             <ButtonPressAnimation onPress={onHashPress} scaleTo={0.96}>
               <Box paddingVertical="12px">
-                <SingleLineTransactionDetailsRow
-                  icon="􀆃"
-                  title={i18n.t(i18n.l.transaction_details.hash)}
-                  value={formattedHash}
-                />
+                <SingleLineTransactionDetailsRow icon="􀆃" title={i18n.t(i18n.l.transaction_details.hash)} value={formattedHash} />
               </Box>
             </ButtonPressAnimation>
           )}
@@ -106,9 +96,7 @@ export const TransactionDetailsHashAndActionsSection: React.FC<Props> = ({
             weight="heavy"
             onPress={onViewOnBlockExplorerPress}
             label={i18n.t(i18n.l.wallet.action.view_on, {
-              blockExplorerName: startCase(
-                ethereumUtils.getBlockExplorer(network)
-              ),
+              blockExplorerName: transaction.explorerLabel ?? startCase(ethereumUtils.getBlockExplorer({ chainId: transaction.chainId })),
             })}
             lightShadows
           />

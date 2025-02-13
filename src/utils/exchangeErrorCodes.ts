@@ -6,9 +6,7 @@ export interface ExchangeQuoteError extends QuoteError {
   explainerType: string;
 }
 
-export default function handleSwapErrorCodes(
-  quoteError: QuoteError
-): ExchangeQuoteError {
+export default function handleSwapErrorCodes(quoteError: QuoteError): ExchangeQuoteError {
   const { error_code: errorCode } = quoteError;
   switch (errorCode) {
     case 501:
@@ -23,6 +21,14 @@ export default function handleSwapErrorCodes(
         explainerType: 'insufficientLiquidity',
         ...quoteError,
       };
+
+    case 503: {
+      return {
+        buttonLabel: lang.t('button.confirm_exchange.fee_on_transfer'),
+        explainerType: 'feeOnTransfer',
+        ...quoteError,
+      };
+    }
 
     case 504:
       return {

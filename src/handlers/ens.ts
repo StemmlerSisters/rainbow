@@ -1,48 +1,30 @@
 import { formatsByCoinType, formatsByName } from '@ensdomains/address-encoder';
 import { getAddress } from '@ethersproject/address';
 import { Resolver } from '@ethersproject/providers';
-import { captureException } from '@sentry/react-native';
 import { Duration, sub } from 'date-fns';
 import { isValidAddress, isZeroAddress } from 'ethereumjs-util';
 import { BigNumber } from '@ethersproject/bignumber';
 import { debounce, isEmpty, sortBy } from 'lodash';
-import { fetchENSAvatar, prefetchENSAvatar } from '../hooks/useENSAvatar';
+import { fetchENSAvatar } from '../hooks/useENSAvatar';
 import { prefetchENSCover } from '../hooks/useENSCover';
 import { prefetchENSRecords } from '../hooks/useENSRecords';
-import { ENSActionParameters, RapActionTypes } from '../raps/common';
-import {
-  getENSData,
-  getNameFromLabelhash,
-  saveENSData,
-} from './localstorage/ens';
-import {
-  estimateGasWithPadding,
-  getProviderForNetwork,
-  TokenStandard,
-} from './web3';
+import { ENSActionParameters, ENSRapActionType } from '@/raps/common';
+import { getENSData, getNameFromLabelhash, saveENSData } from './localstorage/ens';
+import { estimateGasWithPadding, getProvider, TokenStandard } from './web3';
 import { ENSRegistrationRecords, Records, UniqueAsset } from '@/entities';
-import { Network } from '@/helpers';
-import {
-  ENS_DOMAIN,
-  ENS_RECORDS,
-  ENSRegistrationTransactionType,
-  generateSalt,
-  getENSExecutionDetails,
-  getNameOwner,
-} from '@/helpers/ens';
+import { ENS_DOMAIN, ENS_RECORDS, ENSRegistrationTransactionType, generateSalt, getENSExecutionDetails, getNameOwner } from '@/helpers/ens';
 import { add } from '@/helpers/utilities';
 import { ImgixImage } from '@/components/images';
 import { ENS_NFT_CONTRACT_ADDRESS, ethUnits } from '@/references';
-import { labelhash, logger, profileUtils } from '@/utils';
+import { labelhash, profileUtils } from '@/utils';
 import { AvatarResolver } from '@/ens-avatar/src';
 import { ensClient } from '@/graphql';
 import { prefetchFirstTransactionTimestamp } from '@/resources/transactions/firstTransactionTimestampQuery';
 import { prefetchENSAddress } from '@/resources/ens/ensAddressQuery';
-import { handleAndSignImages } from '@/utils/handleAndSignImages';
-import { ENS_MARQUEE_QUERY_KEY } from '@/resources/metadata/ensMarqueeQuery';
-import { queryClient } from '@/react-query';
-import { EnsMarqueeAccount } from '@/graphql/__generated__/metadata';
-import { getEnsMarqueeFallback } from '@/components/ens-registration/IntroMarquee/IntroMarquee';
+import { MimeType, handleNFTImages } from '@/utils/handleNFTImages';
+import store from '@/redux/store';
+import { logger, RainbowError } from '@/logger';
+import { ChainId, Network } from '@/state/backendNetworks/types';
 
 const DUMMY_RECORDS = {
   description: 'description',
@@ -62,8 +44,14 @@ const buildEnsToken = ({
   name: string;
   imageUrl: string;
 }) => {
-  const { imageUrl, lowResUrl } = handleAndSignImages(imageUrl_);
+  const { highResUrl: imageUrl, lowResUrl } = handleNFTImages({
+    originalUrl: imageUrl_,
+    previewUrl: undefined,
+    mimeType: MimeType.SVG,
+  });
   return {
+    acquisition_date: undefined,
+    chainId: ChainId.mainnet,
     animation_url: null,
     asset_contract: {
       address: contractAddress,
@@ -147,8 +135,9 @@ export const fetchMetadata = async ({
     const image_url = `https://metadata.ens.domains/mainnet/${contractAddress}/${tokenId}/image`;
     return { image_url, name };
   } catch (error) {
-    logger.sentry('ENS: Error getting ENS metadata', error);
-    captureException(new Error('ENS: Error getting ENS metadata'));
+    logger.error(new RainbowError(`[ENS]: fetchMetadata failed`), {
+      error,
+    });
     throw error;
   }
 };
@@ -165,9 +154,7 @@ export const fetchEnsTokens = async ({
   try {
     const data = await ensClient.getRegistrationsByAddress({
       address: address.toLowerCase(),
-      registrationDate_gt: Math.floor(
-        sub(new Date(), timeAgo).getTime() / 1000
-      ).toString(),
+      registrationDate_gt: Math.floor(sub(new Date(), timeAgo).getTime() / 1000).toString(),
     });
 
     return (
@@ -175,9 +162,7 @@ export const fetchEnsTokens = async ({
         ?.map(registration => {
           if (!registration.domain) return;
 
-          const tokenId = BigNumber.from(
-            registration.domain.labelhash
-          ).toString();
+          const tokenId = BigNumber.from(registration.domain.labelhash).toString();
           const token = buildEnsToken({
             contractAddress,
             imageUrl: `https://metadata.ens.domains/mainnet/${contractAddress}/${tokenId}/image`,
@@ -186,13 +171,12 @@ export const fetchEnsTokens = async ({
           });
           return token;
         })
-        .filter(
-          <TToken>(token: TToken | null | undefined): token is TToken => !!token
-        ) || []
+        .filter(<TToken>(token: TToken | null | undefined): token is TToken => !!token) || []
     );
   } catch (error) {
-    logger.sentry('ENS: Error getting ENS unique tokens', error);
-    captureException(new Error('ENS: Error getting ENS unique tokens'));
+    logger.error(new RainbowError(`[ENS]: fetchEnsTokens failed`), {
+      error,
+    });
     return [];
   }
 };
@@ -262,9 +246,7 @@ export const fetchSuggestions = async (
         result?.domains
           .filter(domain => !isZeroAddress(domain.owner.id))
           .map(async (domain, i) => {
-            const hasAvatar = domain?.resolver?.texts?.find(
-              text => text === ENS_RECORDS.avatar
-            );
+            const hasAvatar = domain?.resolver?.texts?.find(text => text === ENS_RECORDS.avatar);
             if (!!hasAvatar && profilesEnabled && domain.name) {
               try {
                 const avatar = await fetchENSAvatar(domain.name, {
@@ -296,9 +278,7 @@ export const fetchSuggestions = async (
       const ensSuggestions = domains
         .map((ensDomain: any) => ({
           address: ensDomain?.resolver?.addr?.id || ensDomain?.name,
-          color: profileUtils.addressHashedColorIndex(
-            ensDomain?.resolver?.addr?.id || ensDomain.name
-          ),
+          color: profileUtils.addressHashedColorIndex(ensDomain?.resolver?.addr?.id || ensDomain.name),
           ens: true,
           image: ensDomain?.avatar,
           network: 'mainnet',
@@ -306,9 +286,7 @@ export const fetchSuggestions = async (
           uniqueId: ensDomain?.resolver?.addr?.id || ensDomain.name,
         }))
         .filter(domain => !domain?.nickname?.includes?.('['));
-      suggestions = sortBy(ensSuggestions, domain => domain.nickname?.length, [
-        'asc',
-      ]);
+      suggestions = sortBy(ensSuggestions, domain => domain.nickname?.length, ['asc']);
     }
     setSuggestions(suggestions);
     setIsFetching(false);
@@ -342,12 +320,9 @@ export const fetchAccountDomains = async (address: string) => {
   return domains;
 };
 
-export const fetchImage = async (
-  imageType: 'avatar' | 'header',
-  ensName: string
-) => {
+export const fetchImage = async (imageType: 'avatar' | 'header', ensName: string) => {
   let imageUrl;
-  const provider = await getProviderForNetwork();
+  const provider = getProvider({ chainId: ChainId.mainnet });
   try {
     const avatarResolver = new AvatarResolver(provider);
     imageUrl = await avatarResolver.getImage(ensName, {
@@ -365,25 +340,18 @@ export const fetchImage = async (
   return { imageUrl };
 };
 
-export const fetchRecords = async (
-  ensName: string,
-  { supportedOnly = true }: { supportedOnly?: boolean } = {}
-) => {
+export const fetchRecords = async (ensName: string, { supportedOnly = true }: { supportedOnly?: boolean } = {}) => {
   const response = await ensClient.getTextRecordKeysByName({
     name: ensName,
   });
   const data = response.domains[0] || {};
   const rawRecordKeys = data.resolver?.texts || [];
 
-  const provider = await getProviderForNetwork();
+  const provider = getProvider({ chainId: ChainId.mainnet });
   const resolver = await provider.getResolver(ensName);
   const supportedRecords = Object.values(ENS_RECORDS);
-  const recordKeys = (rawRecordKeys as ENS_RECORDS[]).filter(key =>
-    supportedOnly ? supportedRecords.includes(key) : true
-  );
-  const recordValues = await Promise.all(
-    recordKeys.map((key: string) => resolver?.getText(key))
-  );
+  const recordKeys = (rawRecordKeys as ENS_RECORDS[]).filter(key => (supportedOnly ? supportedRecords.includes(key) : true));
+  const recordValues = await Promise.all(recordKeys.map((key: string) => resolver?.getText(key)));
   const records = recordKeys.reduce((records, key, i) => {
     return {
       ...records,
@@ -401,12 +369,10 @@ export const fetchCoinAddresses = async (
   const response = await ensClient.getCoinTypesByName({ name: ensName });
   const data = response.domains[0] || {};
   const supportedRecords = Object.values(ENS_RECORDS);
-  const provider = await getProviderForNetwork();
+  const provider = getProvider({ chainId: ChainId.mainnet });
   const resolver = await provider.getResolver(ensName);
   const rawCoinTypes: number[] = data.resolver?.coinTypes || [];
-  const rawCoinTypesNames: string[] = rawCoinTypes.map(
-    type => formatsByCoinType[type].name
-  );
+  const rawCoinTypesNames: string[] = rawCoinTypes.map(type => formatsByCoinType[type].name);
   const coinTypes: number[] =
     (rawCoinTypesNames as ENS_RECORDS[])
       .filter(name => (supportedOnly ? supportedRecords.includes(name) : true))
@@ -427,9 +393,7 @@ export const fetchCoinAddresses = async (
     (coinAddresses, coinType, i) => {
       return {
         ...coinAddresses,
-        ...(coinAddressValues[i]
-          ? { [formatsByCoinType[coinType].name]: coinAddressValues[i] }
-          : {}),
+        ...(coinAddressValues[i] ? { [formatsByCoinType[coinType].name]: coinAddressValues[i] } : {}),
       };
     },
     {} as { [key in ENS_RECORDS]: string }
@@ -438,7 +402,7 @@ export const fetchCoinAddresses = async (
 };
 
 export const fetchContenthash = async (ensName: string) => {
-  const provider = await getProviderForNetwork();
+  const provider = getProvider({ chainId: ChainId.mainnet });
   const resolver = await provider.getResolver(ensName);
   const contenthash = await resolver?.getContentHash();
   return contenthash;
@@ -485,7 +449,7 @@ export const fetchRegistration = async (ensName: string) => {
 };
 
 export const fetchPrimary = async (ensName: string) => {
-  const provider = await getProviderForNetwork();
+  const provider = getProvider({ chainId: ChainId.mainnet });
   const address = await provider.resolveName(ensName);
   return {
     address,
@@ -499,33 +463,7 @@ export const fetchAccountPrimary = async (accountAddress: string) => {
   };
 };
 
-export function prefetchENSIntroData() {
-  const ensMarqueeQueryData = queryClient.getQueryData<{
-    ensMarquee: EnsMarqueeAccount[];
-  }>([ENS_MARQUEE_QUERY_KEY]);
-
-  if (ensMarqueeQueryData?.ensMarquee) {
-    const ensMarqueeAccounts = ensMarqueeQueryData.ensMarquee.map(
-      (account: EnsMarqueeAccount) => account.name
-    );
-
-    for (const name of ensMarqueeAccounts) {
-      prefetchENSAddress({ name }, { staleTime: Infinity });
-      prefetchENSAvatar(name, { cacheFirst: true });
-      prefetchENSCover(name, { cacheFirst: true });
-      prefetchENSRecords(name, { cacheFirst: true });
-      prefetchFirstTransactionTimestamp({ addressOrName: name });
-    }
-  }
-}
-
-export const estimateENSCommitGasLimit = async ({
-  name,
-  ownerAddress,
-  duration,
-  rentPrice,
-  salt,
-}: ENSActionParameters) =>
+export const estimateENSCommitGasLimit = async ({ name, ownerAddress, duration, rentPrice, salt }: ENSActionParameters) =>
   estimateENSTransactionGasLimit({
     duration,
     name,
@@ -573,15 +511,7 @@ export const estimateENSRegisterWithConfigGasLimit = async ({
     type: ENSRegistrationTransactionType.REGISTER_WITH_CONFIG,
   });
 
-export const estimateENSRenewGasLimit = async ({
-  name,
-  duration,
-  rentPrice,
-}: {
-  name: string;
-  duration: number;
-  rentPrice: string;
-}) =>
+export const estimateENSRenewGasLimit = async ({ name, duration, rentPrice }: { name: string; duration: number; rentPrice: string }) =>
   estimateENSTransactionGasLimit({
     duration,
     name,
@@ -589,13 +519,7 @@ export const estimateENSRenewGasLimit = async ({
     type: ENSRegistrationTransactionType.RENEW,
   });
 
-export const estimateENSSetNameGasLimit = async ({
-  name,
-  ownerAddress,
-}: {
-  name: string;
-  ownerAddress: string;
-}) =>
+export const estimateENSSetNameGasLimit = async ({ name, ownerAddress }: { name: string; ownerAddress: string }) =>
   estimateENSTransactionGasLimit({
     name,
     ownerAddress,
@@ -700,12 +624,8 @@ export const estimateENSTransactionGasLimit = async ({
     ...(ownerAddress ? { from: ownerAddress } : {}),
     ...(value ? { value } : {}),
   };
-
-  const gasLimit = await estimateGasWithPadding(
-    txPayload,
-    contract?.estimateGas[type],
-    methodArguments
-  );
+  const provider = getProvider({ chainId: ChainId.mainnet });
+  const gasLimit = await estimateGasWithPadding(txPayload, contract?.estimateGas[type], methodArguments, provider);
   return gasLimit;
 };
 
@@ -717,12 +637,15 @@ export const estimateENSRegistrationGasLimit = async (
   records: Records = DUMMY_RECORDS
 ) => {
   const salt = generateSalt();
+  const { selectedGasFee, gasFeeParamsBySpeed } = store.getState().gas;
   const commitGasLimitPromise = estimateENSCommitGasLimit({
     duration,
     name,
     ownerAddress,
     rentPrice,
     salt,
+    selectedGasFee,
+    gasFeeParamsBySpeed,
   });
 
   const setRecordsGasLimitPromise = estimateENSSetRecordsGasLimit({
@@ -735,11 +658,7 @@ export const estimateENSRegistrationGasLimit = async (
     ownerAddress,
   });
 
-  const gasLimits = await Promise.all([
-    commitGasLimitPromise,
-    setRecordsGasLimitPromise,
-    setNameGasLimitPromise,
-  ]);
+  const gasLimits = await Promise.all([commitGasLimitPromise, setRecordsGasLimitPromise, setNameGasLimitPromise]);
 
   let [commitGasLimit, multicallGasLimit, setNameGasLimit] = gasLimits;
   commitGasLimit = commitGasLimit || `${ethUnits.ens_commit}`;
@@ -749,10 +668,7 @@ export const estimateENSRegistrationGasLimit = async (
   const registerWithConfigGasLimit = `${ethUnits.ens_register_with_config}`;
 
   const totalRegistrationGasLimit =
-    [...gasLimits, registerWithConfigGasLimit].reduce(
-      (a, b) => add(a || 0, b || 0),
-      ''
-    ) || `${ethUnits.ens_registration}`;
+    [...gasLimits, registerWithConfigGasLimit].reduce((a, b) => add(a || 0, b || 0), '') || `${ethUnits.ens_registration}`;
 
   return {
     commitGasLimit,
@@ -880,9 +796,7 @@ export const estimateENSSetRecordsGasLimit = async ({
   return gasLimit;
 };
 
-export const formatRecordsForTransaction = (
-  records?: Records
-): ENSRegistrationRecords => {
+export const formatRecordsForTransaction = (records?: Records): ENSRegistrationRecords => {
   const coinAddress = [] as { key: string; address: string }[];
   const text = [] as { key: string; value: string }[];
   let contenthash = null;
@@ -932,43 +846,18 @@ export const formatRecordsForTransaction = (
   return { coinAddress, contenthash, ensAssociatedAddress, text };
 };
 
-export const recordsForTransactionAreValid = (
-  registrationRecords: ENSRegistrationRecords
-) => {
-  const {
-    coinAddress,
-    contenthash,
-    ensAssociatedAddress,
-    text,
-  } = registrationRecords;
-  if (
-    !coinAddress?.length &&
-    typeof contenthash !== 'string' &&
-    !ensAssociatedAddress &&
-    !text?.length
-  ) {
+export const recordsForTransactionAreValid = (registrationRecords: ENSRegistrationRecords) => {
+  const { coinAddress, contenthash, ensAssociatedAddress, text } = registrationRecords;
+  if (!coinAddress?.length && typeof contenthash !== 'string' && !ensAssociatedAddress && !text?.length) {
     return false;
   }
   return true;
 };
 
-export const getTransactionTypeForRecords = (
-  registrationRecords: ENSRegistrationRecords
-) => {
-  const {
-    coinAddress,
-    contenthash,
-    ensAssociatedAddress,
-    text,
-  } = registrationRecords;
+export const getTransactionTypeForRecords = (registrationRecords: ENSRegistrationRecords) => {
+  const { coinAddress, contenthash, ensAssociatedAddress, text } = registrationRecords;
 
-  if (
-    ensAssociatedAddress ||
-    (text?.length || 0) +
-      (coinAddress?.length || 0) +
-      (typeof contenthash === 'string' ? 1 : 0) >
-      1
-  ) {
+  if (ensAssociatedAddress || (text?.length || 0) + (coinAddress?.length || 0) + (typeof contenthash === 'string' ? 1 : 0) > 1) {
     return ENSRegistrationTransactionType.MULTICALL;
   } else if (typeof contenthash === 'string') {
     return ENSRegistrationTransactionType.SET_CONTENTHASH;
@@ -981,18 +870,16 @@ export const getTransactionTypeForRecords = (
   }
 };
 
-export const getRapActionTypeForTxType = (
-  txType: ENSRegistrationTransactionType
-) => {
+export const getRapActionTypeForTxType = (txType: ENSRegistrationTransactionType) => {
   switch (txType) {
     case ENSRegistrationTransactionType.MULTICALL:
-      return RapActionTypes.multicallENS;
+      return ENSRapActionType.multicallENS;
     case ENSRegistrationTransactionType.SET_ADDR:
-      return RapActionTypes.setAddrENS;
+      return ENSRapActionType.setAddrENS;
     case ENSRegistrationTransactionType.SET_TEXT:
-      return RapActionTypes.setTextENS;
+      return ENSRapActionType.setTextENS;
     case ENSRegistrationTransactionType.SET_CONTENTHASH:
-      return RapActionTypes.setContenthashENS;
+      return ENSRapActionType.setContenthashENS;
     default:
       return null;
   }
@@ -1001,7 +888,7 @@ export const getRapActionTypeForTxType = (
 export const fetchReverseRecord = async (address: string) => {
   try {
     const checksumAddress = getAddress(address);
-    const provider = await getProviderForNetwork();
+    const provider = getProvider({ chainId: ChainId.mainnet });
     const reverseRecord = await provider.lookupAddress(checksumAddress);
     return reverseRecord ?? '';
   } catch (e) {
@@ -1011,7 +898,7 @@ export const fetchReverseRecord = async (address: string) => {
 
 export const fetchResolver = async (ensName: string) => {
   try {
-    const provider = await getProviderForNetwork();
+    const provider = getProvider({ chainId: ChainId.mainnet });
     const resolver = await provider.getResolver(ensName);
     return resolver ?? ({} as Resolver);
   } catch (e) {

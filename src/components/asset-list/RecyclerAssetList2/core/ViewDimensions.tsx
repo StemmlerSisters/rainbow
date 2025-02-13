@@ -1,6 +1,5 @@
 import { CoinDividerContainerHeight } from '../../../coin-divider';
-import { CoinRowHeight, SavingsCoinRowHeight } from '../../../coin-row';
-import { SavingsListHeader } from '../../../savings';
+import { CoinRowHeight } from '../../../coin-row';
 import { TokenFamilyHeaderHeight } from '../../../token-family';
 import { UniqueTokenRow } from '../../../unique-token';
 import { AssetListHeaderHeight } from '../../AssetListHeader';
@@ -8,10 +7,7 @@ import { AssetListItemSkeletonHeight } from '../../AssetListItemSkeleton';
 import { CellType } from './ViewTypes';
 import { deviceUtils } from '@/utils';
 import { ProfileActionButtonsRowHeight } from '../profile-header/ProfileActionButtonsRow';
-import {
-  ProfileAvatarRowHeight,
-  ProfileAvatarRowTopInset,
-} from '../profile-header/ProfileAvatarRow';
+import { ProfileAvatarRowHeight, ProfileAvatarRowTopInset } from '../profile-header/ProfileAvatarRow';
 import { ProfileNameRowHeight } from '../profile-header/ProfileNameRow';
 import { ProfileBalanceRowHeight } from '../profile-header/ProfileBalanceRow';
 import { ProfileStickyHeaderHeight } from '../profile-header/ProfileStickyHeader';
@@ -19,6 +15,7 @@ import { RECEIVE_CARD_HEIGHT } from '@/components/cards/ReceiveAssetsCard';
 import { ETH_CARD_HEIGHT } from '@/components/cards/EthCard';
 import { LEARN_CARD_HEIGHT } from '@/components/cards/RotatingLearnCard';
 import { DISCOVER_MORE_BUTTON_HEIGHT } from './DiscoverMoreButton';
+import { IS_IOS } from '@/env';
 
 type Dim = {
   width?: number;
@@ -36,32 +33,33 @@ const ViewDimensions: Record<CellType, Dim> = {
   [CellType.ASSETS_HEADER_SPACE_AFTER]: { height: 16 },
   [CellType.COIN]: { height: CoinRowHeight },
   [CellType.COIN_DIVIDER]: { height: CoinDividerContainerHeight },
-  [CellType.SAVINGS_HEADER_SPACE_BEFORE]: { height: 7 },
-  [CellType.SAVINGS_HEADER]: { height: SavingsListHeader.height },
-  [CellType.SAVINGS]: { height: SavingsCoinRowHeight },
-  [CellType.POOLS_HEADER]: { height: SavingsListHeader.height },
   [CellType.PROFILE_ACTION_BUTTONS_ROW]: {
     height: ProfileActionButtonsRowHeight - ProfileStickyHeaderHeight,
   },
   [CellType.PROFILE_ACTION_BUTTONS_ROW_SPACE_AFTER]: { height: 24 },
   [CellType.PROFILE_AVATAR_ROW]: { height: ProfileAvatarRowHeight },
   [CellType.PROFILE_AVATAR_ROW_SPACE_BEFORE]: {
-    height: ios ? ProfileAvatarRowTopInset : 0,
+    height: IS_IOS ? ProfileAvatarRowTopInset : ProfileAvatarRowTopInset * 2,
   },
   [CellType.PROFILE_AVATAR_ROW_SPACE_AFTER]: { height: 15 },
   [CellType.PROFILE_NAME_ROW]: { height: ProfileNameRowHeight },
   [CellType.PROFILE_NAME_ROW_SPACE_AFTER]: { height: 19 },
   [CellType.PROFILE_BALANCE_ROW]: { height: ProfileBalanceRowHeight },
   [CellType.PROFILE_BALANCE_ROW_SPACE_AFTER]: { height: 24 },
-  [CellType.UNISWAP_POOL]: { height: CoinRowHeight },
   [CellType.NFTS_HEADER]: { height: AssetListHeaderHeight },
   [CellType.NFTS_HEADER_SPACE_BEFORE]: { height: 24 },
   [CellType.NFTS_HEADER_SPACE_AFTER]: { height: 6 },
   [CellType.FAMILY_HEADER]: { height: TokenFamilyHeaderHeight },
   [CellType.NFT]: {
     // @ts-expect-error
-    height: UniqueTokenRow.cardSize + UniqueTokenRow.cardMargin,
+    height: UniqueTokenRow.height,
     width: deviceUtils.dimensions.width / 2 - 0.1,
+  },
+  [CellType.NFTS_LOADING]: {
+    height: TokenFamilyHeaderHeight * 5,
+  },
+  [CellType.NFTS_EMPTY]: {
+    height: TokenFamilyHeaderHeight * 5,
   },
   [CellType.NFT_SPACE_AFTER]: { height: 5 },
   [CellType.LOADING_ASSETS]: { height: AssetListItemSkeletonHeight },
@@ -72,6 +70,14 @@ const ViewDimensions: Record<CellType, Dim> = {
     height: 130,
     width: deviceUtils.dimensions.width / 2 - 0.1,
   },
+  [CellType.CLAIMABLES_HEADER]: { height: AssetListHeaderHeight },
+  [CellType.CLAIMABLES_SPACE_BEFORE]: { height: 10 },
+  [CellType.CLAIMABLES_SPACE_AFTER]: { height: 3 },
+  [CellType.CLAIMABLE]: {
+    height: 60,
+    width: deviceUtils.dimensions.width,
+  },
+  [CellType.REMOTE_CARD_CAROUSEL]: { height: 112 },
 };
 
 export default ViewDimensions;

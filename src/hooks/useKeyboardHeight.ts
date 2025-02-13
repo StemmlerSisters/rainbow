@@ -1,64 +1,75 @@
-import { useIsFocused } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useRef } from 'react';
-import {
-  EmitterSubscription,
-  Keyboard,
-  KeyboardEventListener,
-} from 'react-native';
+import { EmitterSubscription, Keyboard, KeyboardEventListener } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import KeyboardTypes from '@/helpers/keyboardTypes';
 import { setKeyboardHeight } from '@/redux/keyboardHeight';
 import { AppState } from '@/redux/store';
+import { useNavigationStore } from '@/state/navigation/navigationStore';
 
-const keyboardHeightsSelector = (state: AppState) =>
-  state.keyboardHeight.keyboardHeight;
+interface UseKeyboardHeightOptions {
+  keyboardType?: keyof typeof KeyboardTypes;
+  shouldListen?: boolean;
+}
 
-export default function useKeyboardHeight(options = {}) {
+const keyboardHeightsSelector = (state: AppState) => state.keyboardHeight.keyboardHeight;
+
+export default function useKeyboardHeight(options: UseKeyboardHeightOptions = {}) {
   // keyboards can different heights depending on whether
   // things like "autofill" or "autocomplete" are enabled on the target input.
-  // @ts-expect-error ts-migrate(2339) FIXME: Property 'keyboardType' does not exist on type '{}... Remove this comment to see the full error message
-  const { keyboardType = KeyboardTypes.default } = options;
+  const { keyboardType = KeyboardTypes.default, shouldListen = true } = options;
   const listenerRef = useRef<EmitterSubscription>();
 
   const dispatch = useDispatch();
 
   const cachedKeyboardHeights = useSelector(keyboardHeightsSelector);
-  const heightForKeyboardType =
-    cachedKeyboardHeights?.[keyboardType as keyof typeof cachedKeyboardHeights];
+  const heightForKeyboardType = cachedKeyboardHeights?.[keyboardType as keyof typeof cachedKeyboardHeights];
 
-  const isFocused = useIsFocused();
+  const { name: routeName } = useRoute();
 
   const handleKeyboardDidShow: KeyboardEventListener = useCallback(
     event => {
       const newHeight = Math.floor(event.endCoordinates.height);
-
+      const isRouteActive = useNavigationStore.getState().isRouteActive(routeName);
       if (
         // We don't want to set the height cache when the screen is out of focus.
-        isFocused &&
+        isRouteActive &&
         // Only update if there is no existing height in the cache.
         (!heightForKeyboardType || newHeight !== heightForKeyboardType)
       ) {
         dispatch(
           setKeyboardHeight({
             height: newHeight,
-            keyboardType,
+            keyboardType: keyboardType as keyof typeof KeyboardTypes,
           })
         );
-        (Keyboard as any).scheduleLayoutAnimation(event);
       }
     },
-    [dispatch, heightForKeyboardType, isFocused, keyboardType]
+    [dispatch, heightForKeyboardType, keyboardType, routeName]
   );
 
-  useEffect(() => {
-    listenerRef.current = Keyboard.addListener(
-      'keyboardDidShow',
-      handleKeyboardDidShow
-    );
-    return () => {
-      listenerRef.current?.remove();
-    };
+  const addListener = useCallback(() => {
+    if (listenerRef.current) return;
+
+    listenerRef.current = Keyboard.addListener('keyboardDidShow', handleKeyboardDidShow);
   }, [handleKeyboardDidShow]);
+
+  const removeListener = useCallback(() => {
+    if (listenerRef.current === undefined) return;
+
+    listenerRef.current.remove();
+    listenerRef.current = undefined;
+  }, []);
+
+  useEffect(() => {
+    if (shouldListen) {
+      addListener();
+    } else {
+      removeListener();
+    }
+
+    return removeListener;
+  }, [shouldListen, addListener, removeListener]);
 
   return heightForKeyboardType || cachedKeyboardHeights.default || 0;
 }

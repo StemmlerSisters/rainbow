@@ -1,6 +1,5 @@
 import lang from 'i18n-js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { IS_TEST } from '@/env';
 import useUpdateEmoji from '../../../src/hooks/useUpdateEmoji';
 import ProfileModal from './profile/ProfileModal';
 import { analytics } from '@/analytics';
@@ -11,7 +10,6 @@ import { useNavigation } from '@/navigation';
 import Routes from '@/navigation/routesNames';
 import { colors } from '@/styles';
 import { profileUtils } from '@/utils';
-import { delay } from '@rainbow-me/helpers/utilities';
 
 export default function WalletProfileState({
   actionType,
@@ -21,26 +19,18 @@ export default function WalletProfileState({
   onCloseModal,
   profile,
   forceColor,
+  isFromSettings = true,
 }) {
   const [webProfile, setWebProfile] = useState(null);
   const { goBack, navigate } = useNavigation();
   const { getWebProfile } = useUpdateEmoji();
 
   const { color: nameColor, emoji: nameEmoji } = useMemo(
-    () =>
-      getWalletProfileMeta(
-        address,
-        profile,
-        webProfile,
-        isNewProfile,
-        forceColor
-      ),
+    () => getWalletProfileMeta(address, profile, webProfile, isNewProfile, forceColor),
     [address, forceColor, isNewProfile, profile, webProfile]
   );
 
-  const [value, setValue] = useState(
-    profile?.name ? removeFirstEmojiFromString(profile.name) : ''
-  );
+  const [value, setValue] = useState(profile?.name ? removeFirstEmojiFromString(profile.name) : '');
 
   const accentColor = colors.avatarBackgrounds[nameColor];
   const profileImage = profile.image;
@@ -49,44 +39,31 @@ export default function WalletProfileState({
     onCancel?.();
     goBack();
     analytics.track('Tapped "Cancel" on Wallet Profile modal');
-    if (actionType === 'Create') {
+    if (actionType === 'Create' && !isFromSettings) {
       navigate(Routes.CHANGE_WALLET_SHEET);
     }
-  }, [actionType, goBack, navigate, onCancel]);
+  }, [actionType, goBack, navigate, onCancel, isFromSettings]);
 
   const handleSubmit = useCallback(async () => {
     analytics.track('Tapped "Submit" on Wallet Profile modal');
     onCloseModal({
-      color:
-        typeof nameColor === 'string'
-          ? profileUtils.colorHexToIndex(nameColor)
-          : nameColor,
+      color: typeof nameColor === 'string' ? profileUtils.colorHexToIndex(nameColor) : nameColor,
       image: profileImage,
       name: nameEmoji ? `${nameEmoji} ${value}` : value,
     });
     const callback = async () => {
       goBack();
-      if (actionType === 'Create' && isNewProfile) {
+      if (actionType === 'Create' && isNewProfile && !isFromSettings) {
         navigate(Routes.CHANGE_WALLET_SHEET);
       }
     };
-    IS_TEST && (await delay(2000));
+
     if (actionType !== 'Create') {
       callback();
     } else {
       setCallbackAfterObtainingSeedsFromKeychainOrError(callback);
     }
-  }, [
-    actionType,
-    nameColor,
-    goBack,
-    isNewProfile,
-    nameEmoji,
-    navigate,
-    onCloseModal,
-    profileImage,
-    value,
-  ]);
+  }, [actionType, nameColor, goBack, isNewProfile, nameEmoji, navigate, onCloseModal, profileImage, value, isFromSettings]);
 
   useEffect(() => {
     const getProfile = async () => {

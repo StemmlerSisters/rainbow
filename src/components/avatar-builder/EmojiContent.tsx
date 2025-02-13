@@ -14,20 +14,14 @@ type Props = AllEmojiContentEntry & {
   fontSize: number;
 };
 
-const EmojiContent = ({
-  data,
-  columns,
-  onEmojiSelect,
-  cellSize,
-  fontSize,
-}: Props) => {
+const EmojiContent = ({ data, columns, onEmojiSelect, cellSize, fontSize }: Props) => {
   const { colors } = useTheme();
 
   const categoryEmojis = useMemo(() => {
-    let categoryEmojis = [];
+    const categoryEmojis = [];
     for (let i = 0; i < data.length; i += columns) {
-      let rowContent = [];
-      let touchableNet = [];
+      const rowContent = [];
+      const touchableNet = [];
       for (let j = 0; j < columns; j++) {
         if (i + j < data.length) {
           rowContent.push(charFromEmojiObject(data[i + j].emoji));
@@ -45,10 +39,7 @@ const EmojiContent = ({
   return (
     <>
       {categoryEmojis.map(({ rowContent, touchableNet }) => (
-        <View
-          key={`categoryEmoji${rowContent[0]}`}
-          style={[cx.rowContainer, { height: cellSize }]}
-        >
+        <View key={`categoryEmoji${rowContent[0]}`} style={[cx.rowContainer, { height: cellSize }]}>
           {touchableNet.map((singleLine, index) => {
             const touchableProps = {
               key: `categoryEmojiTouchableOpacity${rowContent[0]}${singleLine.sort_order}`,

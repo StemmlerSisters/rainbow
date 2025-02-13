@@ -1,22 +1,10 @@
 import contentHash from '@ensdomains/content-hash';
 import { isHexString } from '@/handlers/web3';
 
-const supportedCodecs = [
-  'ipns-ns',
-  'ipfs-ns',
-  'swarm-ns',
-  'onion',
-  'onion3',
-  'skynet-ns',
-  'arweave-ns',
-];
+const supportedCodecs = ['ipns-ns', 'ipfs-ns', 'swarm-ns', 'onion', 'onion3', 'skynet-ns', 'arweave-ns'];
 
 function matchProtocol(text: string) {
-  return (
-    text.match(/^(ipfs|sia|ipns|bzz|onion|onion3|arweave):\/\/(.*)/) ||
-    text.match(/\/(ipfs)\/(.*)/) ||
-    text.match(/\/(ipns)\/(.*)/)
-  );
+  return text.match(/^(ipfs|sia|ipns|bzz|onion|onion3|arweave):\/\/(.*)/) || text.match(/\/(ipfs)\/(.*)/) || text.match(/\/(ipns)\/(.*)/);
 }
 
 export function encodeContenthash(text: string) {
@@ -24,7 +12,7 @@ export function encodeContenthash(text: string) {
   let encoded = '';
   let error;
   if (text) {
-    let matched = matchProtocol(text);
+    const matched = matchProtocol(text);
     if (matched) {
       contentType = matched[1];
       content = matched[2];

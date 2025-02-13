@@ -1,13 +1,6 @@
 import { addHours, differenceInMinutes, isPast } from 'date-fns';
 import lang from 'i18n-js';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../theme/ThemeContext';
 import { ButtonPressAnimation } from '../animations';
 import { RequestCoinIcon } from '../coin-icon';
@@ -15,10 +8,9 @@ import { RowWithMargins } from '../layout';
 import { Emoji, Text } from '../text';
 import CoinName from './CoinName';
 import CoinRow from './CoinRow';
-import { useNavigation } from '@/navigation';
-import { removeRequest } from '@/redux/requests';
-import Routes from '@/navigation/routesNames';
 import styled from '@/styled-thing';
+import { handleWalletConnectRequest } from '@/utils/requestNavigationHandlers';
+import { removeWalletConnectRequest } from '@/state/walletConnectRequests';
 
 const getPercentageOfTimeElapsed = (startDate, endDate) => {
   const originalDifference = differenceInMinutes(endDate, startDate);
@@ -55,8 +47,6 @@ const TopRow = ({ expirationColor, expiresAt }) => {
 
 const RequestCoinRow = ({ item, ...props }) => {
   const buttonRef = useRef();
-  const dispatch = useDispatch();
-  const { navigate } = useNavigation();
   const [expiresAt, setExpiresAt] = useState(null);
   const [expirationColor, setExpirationColor] = useState(null);
   const [percentElapsed, setPercentElapsed] = useState(null);
@@ -66,29 +56,24 @@ const RequestCoinRow = ({ item, ...props }) => {
     if (item?.displayDetails?.timestampInMs) {
       const _createdAt = new Date(item.displayDetails.timestampInMs);
       const _expiresAt = addHours(_createdAt, 1);
-      const _percentElapsed = getPercentageOfTimeElapsed(
-        _createdAt,
-        _expiresAt
-      );
+      const _percentElapsed = getPercentageOfTimeElapsed(_createdAt, _expiresAt);
       setExpiresAt(_expiresAt);
       setPercentElapsed(_percentElapsed);
-      setExpirationColor(
-        _percentElapsed > 25 ? colors.appleBlue : colors.orange
-      );
+      setExpirationColor(_percentElapsed > 25 ? colors.appleBlue : colors.orange);
     }
   }, [colors, item]);
 
   const handleExpiredRequests = useCallback(() => {
     if (isPast(expiresAt)) {
-      dispatch(removeRequest(item.requestId));
+      removeWalletConnectRequest({
+        walletConnectRequestId: item.requestId,
+      });
     }
-  }, [dispatch, expiresAt, item.requestId]);
+  }, [expiresAt, item.requestId]);
 
   const handlePressOpen = useCallback(() => {
-    navigate(Routes.CONFIRM_REQUEST, {
-      transactionDetails: item,
-    });
-  }, [item, navigate]);
+    handleWalletConnectRequest(item);
+  }, [item]);
 
   useEffect(() => {
     handleExpiredRequests();
@@ -105,11 +90,7 @@ const RequestCoinRow = ({ item, ...props }) => {
   );
 
   return (
-    <ButtonPressAnimation
-      onPress={handlePressOpen}
-      scaleTo={0.98}
-      waitFor={buttonRef}
-    >
+    <ButtonPressAnimation onPress={handlePressOpen} scaleTo={0.98} waitFor={buttonRef}>
       <CoinRow
         {...props}
         {...overridenItem}

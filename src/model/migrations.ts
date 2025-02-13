@@ -1,24 +1,18 @@
 import path from 'path';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { captureException } from '@sentry/react-native';
-import { findKey, isNumber, keys } from 'lodash';
+import { findKey, isEmpty, isNumber, keys } from 'lodash';
 import uniq from 'lodash/uniq';
 import RNFS from 'react-native-fs';
 import { MMKV } from 'react-native-mmkv';
-import { deprecatedRemoveLocal } from '../handlers/localstorage/common';
-import { IMAGE_METADATA } from '../handlers/localstorage/globalSettings';
-import {
-  getMigrationVersion,
-  setMigrationVersion,
-} from '../handlers/localstorage/migrations';
+import FastImage from 'react-native-fast-image';
+import { deprecatedRemoveLocal, getGlobal } from '../handlers/localstorage/common';
+import { IMAGE_METADATA, getNativeCurrency } from '../handlers/localstorage/globalSettings';
+import { getMigrationVersion, setMigrationVersion } from '../handlers/localstorage/migrations';
 import WalletTypes from '../helpers/walletTypes';
 import { BooleanMap } from '../hooks/useCoinListEditOptions';
 import store from '../redux/store';
 import { walletsSetSelected, walletsUpdate } from '../redux/wallets';
-import {
-  RB_TOKEN_LIST_CACHE,
-  RB_TOKEN_LIST_ETAG,
-} from '../references/rainbow-token-list';
+import { RB_TOKEN_LIST_CACHE, RB_TOKEN_LIST_ETAG } from '../references/rainbow-token-list';
 import colors, { getRandomColor } from '../styles/colors';
 import {
   addressKey,
@@ -30,36 +24,31 @@ import {
   signingWallet,
   signingWalletAddress,
 } from '../utils/keychainConstants';
-import {
-  hasKey,
-  loadString,
-  publicAccessControlOptions,
-  saveString,
-} from './keychain';
-import {
-  DEFAULT_WALLET_NAME,
-  loadAddress,
-  RainbowAccount,
-  RainbowWallet,
-  saveAddress,
-} from './wallet';
-import { isL2Asset } from '@/handlers/assets';
-import {
-  getAssets,
-  getHiddenCoins,
-  getPinnedCoins,
-  saveHiddenCoins,
-  savePinnedCoins,
-} from '@/handlers/localstorage/accountLocal';
+import { hasKey, loadString, publicAccessControlOptions, saveString } from './keychain';
+import { DEFAULT_WALLET_NAME, loadAddress, RainbowAccount, RainbowWallet, saveAddress } from './wallet';
+import { getAssets, getHiddenCoins, getPinnedCoins, saveHiddenCoins, savePinnedCoins } from '@/handlers/localstorage/accountLocal';
 import { getContacts, saveContacts } from '@/handlers/localstorage/contacts';
-import { getUserLists, saveUserLists } from '@/handlers/localstorage/userLists';
 import { resolveNameOrAddress } from '@/handlers/web3';
 import { returnStringFirstEmoji } from '@/helpers/emojiHandler';
 import { updateWebDataEnabled } from '@/redux/showcaseTokens';
-import { DefaultTokenLists } from '@/references';
 import { ethereumUtils, profileUtils } from '@/utils';
-import { REVIEW_ASKED_KEY } from '@/utils/reviewAlert';
-import logger from '@/utils/logger';
+import { review } from '@/storage';
+import { logger, RainbowError } from '@/logger';
+import { queryClient } from '@/react-query';
+import { clearReactQueryCache } from '@/react-query/reactQueryUtils';
+import { favoritesQueryKey } from '@/resources/favorites';
+import { EthereumAddress, RainbowToken } from '@/entities';
+import { standardizeUrl, useFavoriteDappsStore } from '@/state/browser/favoriteDappsStore';
+import { useLegacyFavoriteDappsStore } from '@/state/legacyFavoriteDapps';
+import { getAddressAndChainIdFromUniqueId, getUniqueId, getUniqueIdNetwork } from '@/utils/ethereumUtils';
+import { ParsedAssetsDictByChain, ParsedSearchAsset, UniqueId } from '@/__swaps__/types/assets';
+import { userAssetsStore } from '@/state/assets/userAssets';
+import { userAssetsStoreManager } from '@/state/assets/userAssetsStoreManager';
+import { userAssetsQueryKey } from '@/__swaps__/screens/Swap/resources/assets/userAssets';
+import { useConnectedToAnvilStore } from '@/state/connectedToAnvil';
+import { selectorFilterByUserChains, selectUserAssetsList } from '@/__swaps__/screens/Swap/resources/_selectors/assets';
+import { UnlockableAppIconKey, unlockableAppIcons } from '@/appIcons/appIcons';
+import { unlockableAppIconStorage } from '@/featuresToUnlock/unlockableAppIconCheck';
 
 export default async function runMigrations() {
   // get current version
@@ -73,13 +62,11 @@ export default async function runMigrations() {
    * using the updated Keychain settings (THIS_DEVICE_ONLY)
    */
   const v0 = async () => {
-    logger.sentry('Start migration v0');
     const walletAddress = await loadAddress();
     if (walletAddress) {
-      logger.sentry('v0 migration - Save loaded address');
+      logger.debug('[runMigrations]: v0 migration - Save loaded address');
       await saveAddress(walletAddress);
     }
-    logger.sentry('Complete migration v0');
   };
 
   migrations.push(v0);
@@ -91,14 +78,13 @@ export default async function runMigrations() {
    * that were created / imported before we launched this feature
    */
   const v1 = async () => {
-    logger.sentry('Start migration v1');
     const { selected } = store.getState().wallets;
 
     if (!selected) {
       // Read from the old wallet data
       const address = await loadAddress();
       if (address) {
-        logger.sentry('v1 migration - address found');
+        logger.debug('[runMigrations]: v1 migration - address found');
         const id = `wallet_${Date.now()}`;
         const currentWallet = {
           addresses: [
@@ -121,12 +107,11 @@ export default async function runMigrations() {
 
         const wallets = { [id]: currentWallet };
 
-        logger.sentry('v1 migration - update wallets and selected wallet');
+        logger.debug('[runMigrations]: v1 migration - update wallets and selected wallet');
         await store.dispatch(walletsUpdate(wallets));
         await store.dispatch(walletsSetSelected(currentWallet));
       }
     }
-    logger.sentry('Complete migration v1');
   };
 
   migrations.push(v1);
@@ -137,11 +122,10 @@ export default async function runMigrations() {
    * which are the only wallets allowed to create new accounts under it
    */
   const v2 = async () => {
-    logger.sentry('Start migration v2');
     const { wallets, selected } = store.getState().wallets;
 
     if (!wallets) {
-      logger.sentry('Complete migration v2 early');
+      logger.debug('[runMigrations]: Complete migration v2 early');
       return;
     }
 
@@ -152,7 +136,7 @@ export default async function runMigrations() {
     // if there's a wallet with seed phrase that wasn't imported
     // and set it as primary
     if (!primaryWallet) {
-      logger.sentry('v2 migration - primary wallet not found');
+      logger.debug('[runMigrations]: v2 migration - primary wallet not found');
       let primaryWalletKey = null;
       Object.keys(wallets).some(key => {
         const wallet = wallets[key];
@@ -182,7 +166,7 @@ export default async function runMigrations() {
           ...updatedWallets[primaryWalletKey],
           primary: true,
         };
-        logger.sentry('v2 migration - update wallets');
+        logger.debug('[runMigrations]: v2 migration - update wallets');
         await store.dispatch(walletsUpdate(updatedWallets));
         // Additionally, we need to check if it's the selected wallet
         // and if that's the case, update it too
@@ -192,7 +176,6 @@ export default async function runMigrations() {
         }
       }
     }
-    logger.sentry('Complete migration v2');
   };
 
   migrations.push(v2);
@@ -203,7 +186,7 @@ export default async function runMigrations() {
    */
 
   const v3 = async () => {
-    logger.sentry('Ignoring migration v3');
+    logger.debug('[runMigrations]: Ignoring migration v3');
     return true;
   };
 
@@ -215,7 +198,7 @@ export default async function runMigrations() {
    */
 
   const v4 = async () => {
-    logger.sentry('Ignoring migration v4');
+    logger.debug('[runMigrations]: Ignoring migration v4');
     return true;
   };
 
@@ -227,67 +210,65 @@ export default async function runMigrations() {
    * incorrectly by the keychain integrity checks
    */
   const v5 = async () => {
-    logger.sentry('Start migration v5');
     const { wallets, selected } = store.getState().wallets;
 
     if (!wallets) {
-      logger.sentry('Complete migration v5 early');
+      logger.debug('[runMigrations]: Complete migration v5 early');
       return;
     }
 
     const hasMigratedFlag = await hasKey(oldSeedPhraseMigratedKey);
     if (!hasMigratedFlag) {
-      logger.sentry('Migration flag not set');
+      logger.debug('[runMigrations]: Migration flag not set');
       const hasOldSeedphraseKey = await hasKey(seedPhraseKey);
       if (hasOldSeedphraseKey) {
-        logger.sentry('Old seedphrase is still there');
+        logger.debug('[runMigrations]: Old seedphrase is still there');
         let incorrectDamagedWalletId = null;
         const updatedWallets = { ...wallets };
         keys(updatedWallets).forEach(walletId => {
-          if (
-            updatedWallets[walletId].damaged &&
-            !updatedWallets[walletId].imported
-          ) {
-            logger.sentry('found incorrect damaged wallet', walletId);
+          if (updatedWallets[walletId].damaged && !updatedWallets[walletId].imported) {
+            logger.debug(`[runMigrations]: found incorrect damaged wallet ${walletId}`);
             delete updatedWallets[walletId].damaged;
             incorrectDamagedWalletId = walletId;
           }
         });
-        logger.sentry('updating all wallets');
+        logger.debug('[runMigrations]: updating all wallets');
         await store.dispatch(walletsUpdate(updatedWallets));
-        logger.sentry('done updating all wallets');
+        logger.debug('[runMigrations]: done updating all wallets');
         // Additionally, we need to check if it's the selected wallet
         // and if that's the case, update it too
         if (selected!.id === incorrectDamagedWalletId) {
-          logger.sentry('need to update the selected wallet');
-          const updatedSelectedWallet =
-            updatedWallets[incorrectDamagedWalletId];
+          logger.debug('[runMigrations]: need to update the selected wallet');
+          const updatedSelectedWallet = updatedWallets[incorrectDamagedWalletId];
           await store.dispatch(walletsSetSelected(updatedSelectedWallet));
-          logger.sentry('selected wallet updated');
+          logger.debug('[runMigrations]: selected wallet updated');
         }
       }
     }
-    logger.sentry('Complete migration v5');
   };
 
   migrations.push(v5);
 
+  /**
+   * NOTICE: this migration is no longer in use. userLists has been removed.
+   */
   /* Fix dollars => stablecoins */
   const v6 = async () => {
-    try {
-      const userLists = await getUserLists();
-      const newLists = userLists.map((list: { id: string }) => {
-        if (list?.id !== 'dollars') {
-          return list;
-        }
-        return DefaultTokenLists['mainnet'].find(
-          ({ id }) => id === 'stablecoins'
-        );
-      });
-      await saveUserLists(newLists);
-    } catch (e) {
-      logger.log('ignoring lists migrations');
-    }
+    logger.debug('[runMigrations]: Ignoring migration v6');
+    // try {
+    //   const userLists = await getUserLists();
+    //   const newLists = userLists.map((list: { id: string }) => {
+    //     if (list?.id !== 'dollars') {
+    //       return list;
+    //     }
+    //     return DefaultTokenLists['mainnet'].find(
+    //       ({ id }) => id === 'stablecoins'
+    //     );
+    //   });
+    //   await saveUserLists(newLists);
+    // } catch (e) {
+    //   logger.log('ignoring lists migrations');
+    // }
   };
 
   migrations.push(v6);
@@ -302,9 +283,9 @@ export default async function runMigrations() {
       const wallet = wallets[walletKeys[i]];
       if (wallet.type !== WalletTypes.readOnly) {
         // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let x = 0; x < wallet.addresses.length; x++) {
-          const { address } = wallet.addresses[x];
-          logger.log('setting web profiles for address', address);
+        for (let x = 0; x < (wallet.addresses || []).length; x++) {
+          const { address } = (wallet.addresses || [])[x];
+          logger.debug(`[runMigrations]: setting web profiles for address ${address}`);
           await store.dispatch(updateWebDataEnabled(true, address));
         }
       }
@@ -314,7 +295,7 @@ export default async function runMigrations() {
   migrations.push(v7);
 
   const v8 = async () => {
-    logger.log('wiping old metadata');
+    logger.debug('[runMigrations]: wiping old metadata');
     await deprecatedRemoveLocal(IMAGE_METADATA);
   };
 
@@ -327,49 +308,41 @@ export default async function runMigrations() {
    * same for contacts
    */
   const v9 = async () => {
-    logger.log('Start migration v9');
     // map from old color index to closest new color's index
     const newColorIndexes = [0, 4, 12, 21, 1, 20, 4, 9, 10];
     try {
       const { selected, wallets } = store.getState().wallets;
       if (!wallets) return;
       const walletKeys = Object.keys(wallets);
-      let updatedWallets = { ...wallets };
+      const updatedWallets = { ...wallets };
       // eslint-disable-next-line @typescript-eslint/prefer-for-of
       for (let i = 0; i < walletKeys.length; i++) {
         const wallet = wallets[walletKeys[i]];
-        const newAddresses = wallet.addresses.map((account: RainbowAccount) => {
+        const newAddresses = (wallet.addresses || []).map((account: RainbowAccount) => {
           const accountEmoji = returnStringFirstEmoji(account?.label);
           return {
             ...account,
             ...(!accountEmoji && {
-              label: `${profileUtils.addressHashedEmoji(account.address)} ${
-                account.label
-              }`,
+              label: `${profileUtils.addressHashedEmoji(account.address)} ${account.label}`,
             }),
-            color:
-              (accountEmoji
-                ? newColorIndexes[account.color]
-                : profileUtils.addressHashedColorIndex(account.address)) || 0,
+            color: (accountEmoji ? newColorIndexes[account.color] : profileUtils.addressHashedColorIndex(account.address)) || 0,
           };
         });
         const newWallet = { ...wallet, addresses: newAddresses };
         updatedWallets[walletKeys[i]] = newWallet;
       }
-      logger.log('update wallets in store to index new colors');
+      logger.debug('[runMigrations]: update wallets in store to index new colors');
       await store.dispatch(walletsUpdate(updatedWallets));
 
       const selectedWalletId = selected?.id;
       if (selectedWalletId) {
-        logger.log('update selected wallet to index new color');
-        await store.dispatch(
-          walletsSetSelected(updatedWallets[selectedWalletId])
-        );
+        logger.debug('[runMigrations]: update selected wallet to index new color');
+        await store.dispatch(walletsSetSelected(updatedWallets[selectedWalletId]));
       }
 
       // migrate contacts to new color index
       const contacts = await getContacts();
-      let updatedContacts = { ...contacts };
+      const updatedContacts = { ...contacts };
       if (!contacts) return;
       const contactKeys = Object.keys(contacts);
       // eslint-disable-next-line @typescript-eslint/prefer-for-of
@@ -379,18 +352,15 @@ export default async function runMigrations() {
           ...contact,
           color: isNumber(contact.color)
             ? newColorIndexes[contact.color]
-            : typeof contact.color === 'string' &&
-              colors.avatarBackgrounds.includes(contact.color)
-            ? colors.avatarBackgrounds.indexOf(contact.color)
-            : getRandomColor(),
+            : typeof contact.color === 'string' && colors.avatarBackgrounds.includes(contact.color)
+              ? colors.avatarBackgrounds.indexOf(contact.color)
+              : getRandomColor(),
         };
       }
-      logger.log('update contacts to index new colors');
+      logger.debug('[runMigrations]: update contacts to index new colors');
       await saveContacts(updatedContacts);
     } catch (error) {
-      logger.sentry('Migration v9 failed: ', error);
-      const migrationError = new Error('Migration 9 failed');
-      captureException(migrationError);
+      logger.error(new RainbowError(`[runMigrations]: Migration v9 failed: ${error}`));
     }
   };
 
@@ -401,11 +371,10 @@ export default async function runMigrations() {
    * This step makes sure all contacts have an emoji set based on the address
    */
   const v10 = async () => {
-    logger.log('Start migration v10');
     try {
       // migrate contacts to corresponding emoji
       const contacts = await getContacts();
-      let updatedContacts = { ...contacts };
+      const updatedContacts = { ...contacts };
       if (!contacts) return;
       const contactKeys = Object.keys(contacts);
       // eslint-disable-next-line @typescript-eslint/prefer-for-of
@@ -427,20 +396,16 @@ export default async function runMigrations() {
               };
             }
           } catch (error) {
-            const migrationError = new Error(
-              `Error during v10 migration contact address resolution for ${contact.address}`
-            );
+            const migrationError = new Error(`Error during v10 migration contact address resolution for ${contact.address}`);
             captureException(migrationError);
             continue;
           }
         }
       }
-      logger.log('update contacts to add emojis / colors');
+      logger.debug('[runMigrations]: update contacts to add emojis / colors');
       await saveContacts(updatedContacts);
     } catch (error) {
-      logger.sentry('Migration v10 failed: ', error);
-      const migrationError = new Error('Migration 10 failed');
-      captureException(migrationError);
+      logger.error(new RainbowError(`[runMigrations]: Migration v10 failed: ${error}`));
     }
   };
 
@@ -451,17 +416,23 @@ export default async function runMigrations() {
    * This step resets review timers if we havnt asked in the last 2 weeks prior to running this
    */
   const v11 = async () => {
-    logger.log('Start migration v11');
-    const reviewAsked = await AsyncStorage.getItem(REVIEW_ASKED_KEY);
+    const hasReviewed = review.get(['hasReviewed']);
+    if (hasReviewed) {
+      logger.debug('[runMigrations]: Migration v11: exiting early - already reviewed');
+      return;
+    }
+
+    const reviewAsked = review.get(['timeOfLastPrompt']);
     const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
     const TWO_MONTHS = 2 * 30 * 24 * 60 * 60 * 1000;
 
     if (Number(reviewAsked) > Date.now() - TWO_WEEKS) {
+      logger.debug('[runMigrations]: Migration v11: exiting early - not reviewed in the last 2 weeks');
       return;
-    } else {
-      const twoMonthsAgo = Date.now() - TWO_MONTHS;
-      AsyncStorage.setItem(REVIEW_ASKED_KEY, twoMonthsAgo.toString());
     }
+
+    review.set(['timeOfLastPrompt'], Date.now() - TWO_MONTHS);
+    logger.debug('[runMigrations]: Migration v11: updated review timeOfLastPrompt');
   };
 
   migrations.push(v11);
@@ -479,38 +450,28 @@ export default async function runMigrations() {
     for (let i = 0; i < walletKeys.length; i++) {
       const wallet = wallets[walletKeys[i]];
       // eslint-disable-next-line @typescript-eslint/prefer-for-of
-      for (let x = 0; x < wallet.addresses.length; x++) {
-        const { address } = wallet.addresses[x];
+      for (let x = 0; x < (wallet.addresses || []).length; x++) {
+        const { address } = (wallet.addresses || [])[x];
 
         const assets = await getAssets(address, network);
         const hiddenCoins = await getHiddenCoins(address, network);
         const pinnedCoins = await getPinnedCoins(address, network);
 
-        logger.log(JSON.stringify({ pinnedCoins }, null, 2));
-        logger.log(JSON.stringify({ hiddenCoins }, null, 2));
+        logger.debug(`[runMigrations]: pinnedCoins: ${JSON.stringify({ pinnedCoins }, null, 2)}`);
+        logger.debug(`[runMigrations]: hiddenCoins: ${JSON.stringify({ hiddenCoins }, null, 2)}`);
 
         const pinnedCoinsMigrated = pinnedCoins.map((address: string) => {
-          const asset = assets?.find(
-            (asset: any) => asset.address === address.toLowerCase()
-          );
-          if (asset?.type && isL2Asset(asset.type)) {
-            return `${asset.address}_${asset.network}`;
-          } else {
-            return address;
-          }
+          const asset = assets?.find((asset: any) => asset.address === address.toLowerCase());
+          return getUniqueIdNetwork(asset?.address, network);
         });
 
         const hiddenCoinsMigrated = hiddenCoins.map((address: string) => {
           const asset = ethereumUtils.getAsset(assets, address);
-          if (asset?.type && isL2Asset(asset.type)) {
-            return `${asset.address}_${asset.network}`;
-          } else {
-            return address;
-          }
+          return getUniqueIdNetwork(asset?.address, network);
         });
 
-        logger.log(JSON.stringify({ pinnedCoinsMigrated }, null, 2));
-        logger.log(JSON.stringify({ hiddenCoinsMigrated }, null, 2));
+        logger.debug(`[runMigrations]: pinnedCoinsMigrated: ${JSON.stringify({ pinnedCoinsMigrated }, null, 2)}`);
+        logger.debug(`[runMigrations]: hiddenCoinsMigrated: ${JSON.stringify({ hiddenCoinsMigrated }, null, 2)}`);
 
         await savePinnedCoins(uniq(pinnedCoinsMigrated), address, network);
         await saveHiddenCoins(uniq(hiddenCoinsMigrated), address, network);
@@ -540,8 +501,8 @@ export default async function runMigrations() {
       // which look like'signature_0x...'
       const { wallets } = store.getState().wallets;
       if (Object.keys(wallets!).length > 0) {
-        for (let wallet of Object.values(wallets!)) {
-          for (let account of (wallet as RainbowWallet).addresses) {
+        for (const wallet of Object.values(wallets!)) {
+          for (const account of (wallet as RainbowWallet).addresses) {
             keysToMigrate.push(`signature_${account.address}`);
           }
         }
@@ -552,17 +513,14 @@ export default async function runMigrations() {
           const value = await loadString(key);
           if (typeof value === 'string') {
             await saveString(key, value, publicAccessControlOptions);
-            logger.debug('key migrated', key);
+            logger.debug(`[runMigrations]: key migrated: ${key}`);
           }
         } catch (error) {
-          logger.sentry('Error migration 13 :: key ', key);
-          logger.sentry('reason', error);
+          logger.error(new RainbowError(`[runMigrations]: Error migration 13 :: key ${key}: ${error}`));
         }
       }
     } catch (error) {
-      logger.sentry('Migration v13 failed: ', error);
-      const migrationError = new Error('Migration 13 failed');
-      captureException(migrationError);
+      logger.error(new RainbowError(`[runMigrations]: Migration v13 failed: ${error}`));
     }
   };
 
@@ -577,19 +535,13 @@ export default async function runMigrations() {
     const { network } = store.getState().settings;
     const { wallets } = store.getState().wallets;
     if (!wallets) return;
-    for (let wallet of Object.values(wallets)) {
-      for (let account of (wallet as RainbowWallet).addresses) {
+    for (const wallet of Object.values(wallets)) {
+      for (const account of (wallet as RainbowWallet).addresses) {
         const hiddenCoins = await getHiddenCoins(account.address, network);
         const pinnedCoins = await getPinnedCoins(account.address, network);
 
-        mmkv.set(
-          'pinned-coins-' + account.address,
-          JSON.stringify(pinnedCoins)
-        );
-        mmkv.set(
-          'hidden-coins-' + account.address,
-          JSON.stringify(hiddenCoins)
-        );
+        mmkv.set('pinned-coins-' + account.address, JSON.stringify(pinnedCoins));
+        mmkv.set('hidden-coins-' + account.address, JSON.stringify(hiddenCoins));
       }
     }
   };
@@ -601,6 +553,7 @@ export default async function runMigrations() {
    Ignored
    */
   const v15 = async () => {
+    logger.debug('[runMigrations]: Ignoring migration v15');
     return true;
   };
 
@@ -613,21 +566,15 @@ export default async function runMigrations() {
    */
   const v16 = async () => {
     try {
-      RNFS.unlink(
-        path.join(RNFS.CachesDirectoryPath, `${RB_TOKEN_LIST_CACHE}.json`)
-      ).catch(() => {
+      RNFS.unlink(path.join(RNFS.CachesDirectoryPath, `${RB_TOKEN_LIST_CACHE}.json`)).catch(() => {
         // we don't care if it fails
       });
 
-      RNFS.unlink(
-        path.join(RNFS.CachesDirectoryPath, `${RB_TOKEN_LIST_ETAG}.json`)
-      ).catch(() => {
+      RNFS.unlink(path.join(RNFS.CachesDirectoryPath, `${RB_TOKEN_LIST_ETAG}.json`)).catch(() => {
         // we don't care if it fails
       });
     } catch (error: any) {
-      logger.sentry('Migration v16 failed: ', error);
-      const migrationError = new Error('Migration 16 failed');
-      captureException(migrationError);
+      logger.error(new RainbowError(`[runMigrations]: Migration v16 failed: ${error}`));
     }
   };
 
@@ -640,14 +587,10 @@ export default async function runMigrations() {
   const v17 = async () => {
     const { wallets } = store.getState().wallets;
     if (!wallets) return;
-    for (let wallet of Object.values(wallets)) {
-      for (let account of (wallet as RainbowWallet).addresses) {
-        const pinnedCoins = JSON.parse(
-          mmkv.getString('pinned-coins-' + account.address) ?? '[]'
-        );
-        const hiddenCoins = JSON.parse(
-          mmkv.getString('hidden-coins-' + account.address) ?? '[]'
-        );
+    for (const wallet of Object.values(wallets)) {
+      for (const account of (wallet as RainbowWallet).addresses) {
+        const pinnedCoins = JSON.parse(mmkv.getString('pinned-coins-' + account.address) ?? '[]');
+        const hiddenCoins = JSON.parse(mmkv.getString('hidden-coins-' + account.address) ?? '[]');
         mmkv.set(
           'hidden-coins-obj-' + account.address,
           JSON.stringify(
@@ -673,20 +616,195 @@ export default async function runMigrations() {
 
   migrations.push(v17);
 
-  logger.sentry(
-    `Migrations: ready to run migrations starting on number ${currentVersion}`
-  );
+  /**
+   *************** Migration v18 ******************
+   Move favorites from local storage to react query persistent cache (AsyncStorage)
+   */
+  const v18 = async () => {
+    const favoritesMetadata = await getGlobal('uniswapFavoritesMetadata', undefined, '0.1.0');
 
+    if (favoritesMetadata) {
+      const lowercasedFavoritesMetadata: Record<EthereumAddress, RainbowToken> = {};
+      Object.keys(favoritesMetadata).forEach((address: string) => {
+        lowercasedFavoritesMetadata[address.toLowerCase()] = favoritesMetadata[address];
+      });
+      queryClient.setQueryData(favoritesQueryKey, lowercasedFavoritesMetadata);
+    }
+  };
+
+  migrations.push(v18);
+
+  /**
+   *************** Migration v19 ******************
+   * Deleted migration
+   */
+  const v19 = async () => {
+    return;
+  };
+
+  migrations.push(v19);
+
+  /**
+   *************** Migration v20 ******************
+   * Migrates dapp browser favorites store from createStore to createRainbowStore
+   */
+  const v20 = async () => {
+    const initializeLegacyStore = () => {
+      return new Promise<void>(resolve => {
+        // Give the async legacy store a moment to initialize
+        setTimeout(() => {
+          resolve();
+        }, 1000);
+      });
+    };
+
+    await initializeLegacyStore();
+    const legacyFavorites = useLegacyFavoriteDappsStore.getState().favoriteDapps;
+
+    if (legacyFavorites.length > 0) {
+      // Re-standardize URLs to ensure they're in the correct format
+      for (const favorite of legacyFavorites) {
+        favorite.url = standardizeUrl(favorite.url);
+      }
+      useFavoriteDappsStore.setState({ favoriteDapps: legacyFavorites });
+      useLegacyFavoriteDappsStore.setState({ favoriteDapps: [] });
+    }
+  };
+
+  migrations.push(v20);
+
+  /**
+   *************** Migration v21 ******************
+   * Migrate hidden coins from MMKV to Zustand
+   */
+  const v21 = async () => {
+    const { wallets } = store.getState().wallets;
+    if (!wallets) return;
+
+    for (const wallet of Object.values(wallets)) {
+      for (const { address } of (wallet as RainbowWallet).addresses) {
+        const hiddenCoins = JSON.parse(mmkv.getString('hidden-coins-obj-' + address) ?? '{}');
+        if (isEmpty(hiddenCoins)) continue;
+
+        const hiddenAssets = Object.keys(hiddenCoins).reduce<UniqueId[]>((acc: UniqueId[], key) => {
+          // we need to run it through this funciton because users could have legacy coins when we had network-based uniqueId
+          const { address, chainId } = getAddressAndChainIdFromUniqueId(key);
+          const uniqueId = getUniqueId(address, chainId);
+          acc.push(uniqueId);
+          return acc;
+        }, []);
+
+        userAssetsStore.getState(address).setHiddenAssets(hiddenAssets);
+
+        // remove the old hidden coins obj storage
+        mmkv.delete('hidden-coins-obj-' + address);
+      }
+    }
+  };
+
+  migrations.push(v21);
+
+  /**
+   *************** Migration v22 ******************
+   * Reset icon checks
+   */
+  const v22 = async () => {
+    // For each appIcon, delete the handled flag
+    (Object.keys(unlockableAppIcons) as UnlockableAppIconKey[]).map(appIconKey => {
+      unlockableAppIconStorage.delete(appIconKey);
+      logger.debug('Resetting icon status for ' + appIconKey);
+    });
+  };
+
+  migrations.push(v22);
+
+  /**
+   *************** Migration v23 ******************
+   * Populate `legacyUserAssets` attribute in `userAssetsStore`
+   */
+  const v23 = async () => {
+    const state = store.getState();
+    const { wallets } = state.wallets;
+    const { nativeCurrency } = state.settings;
+
+    if (!wallets) return;
+
+    for (const wallet of Object.values(wallets)) {
+      for (const { address } of (wallet as RainbowWallet).addresses) {
+        const { connectedToAnvil } = useConnectedToAnvilStore.getState();
+        const queryKey = userAssetsQueryKey({ address, currency: nativeCurrency, testnetMode: connectedToAnvil });
+        const queryData: ParsedAssetsDictByChain | undefined = queryClient.getQueryData(queryKey);
+
+        if (!queryData) continue;
+
+        const userAssets = selectorFilterByUserChains({
+          data: queryData,
+          selector: selectUserAssetsList,
+        });
+        userAssetsStore.getState(address).setUserAssets({
+          address,
+          chainIdsWithErrors: null,
+          state: undefined,
+          userAssets: userAssets as ParsedSearchAsset[],
+        });
+      }
+    }
+  };
+
+  migrations.push(v23);
+
+  /**
+   *************** Migration v24 ******************
+   * Clear FastImage cache to fix mainnet badge sizing issue
+   */
+  const v24 = () => {
+    try {
+      FastImage.clearDiskCache();
+    } catch (e) {
+      logger.error(new RainbowError(`Error clearing FastImage disk cache: ${e}`));
+    }
+
+    try {
+      FastImage.clearMemoryCache();
+    } catch (e) {
+      logger.error(new RainbowError(`Error clearing FastImage memory cache: ${e}`));
+    }
+  };
+
+  migrations.push(v24);
+
+  /**
+   *************** Migration v25 ******************
+   * Delete all queries except favorites
+   */
+  const v25 = async () => {
+    await clearReactQueryCache({ analyzeAfterClearing: false });
+  };
+
+  migrations.push(v25);
+
+  /**
+   *************** Migration v26 ******************
+   * Migrate native currency setting to userAssetsStoreManager
+   */
+  const v26 = async () => {
+    const currency = await getNativeCurrency();
+    userAssetsStoreManager.setState({ currency });
+  };
+
+  migrations.push(v26);
+
+  logger.debug(`[runMigrations]: ready to run migrations starting on number ${currentVersion}`);
+  // await setMigrationVersion(17);
   if (migrations.length === currentVersion) {
-    logger.sentry(`Migrations: Nothing to run`);
+    logger.debug(`[runMigrations]: Nothing to run`);
     return;
   }
 
   for (let i = currentVersion; i < migrations.length; i++) {
-    logger.sentry(`Migrations: Running migration v${i}`);
-    // @ts-expect-error
+    logger.debug(`[runMigrations]: Running migration v${i}`);
     await migrations[i].apply(null);
-    logger.sentry(`Migrations: Migration ${i} completed succesfully`);
+    logger.debug(`[runMigrations]: Migration ${i} completed succesfully`);
     await setMigrationVersion(i + 1);
   }
 }

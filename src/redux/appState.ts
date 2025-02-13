@@ -11,7 +11,7 @@ const APP_STATE_UPDATE = 'contacts/APP_STATE_UPDATE';
  * is called `appState`, matching the pattern used by other reducers makes
  * this interface `AppStateState` :).
  */
-interface AppStateState {
+export interface AppStateState {
   /**
    * Whether or not the user's wallet has loaded.
    */
@@ -32,9 +32,7 @@ interface AppStateUpdateAction {
  *
  * @param stateToUpdate The updates to apply to the state.
  */
-export const appStateUpdate = (stateToUpdate: Partial<AppStateState>) => (
-  dispatch: Dispatch<AppStateUpdateAction>
-) => {
+export const appStateUpdate = (stateToUpdate: Partial<AppStateState>) => (dispatch: Dispatch<AppStateUpdateAction>) => {
   dispatch({
     payload: stateToUpdate,
     type: APP_STATE_UPDATE,
@@ -47,10 +45,7 @@ const INITIAL_STATE: AppStateState = {
   walletReady: false,
 };
 
-export default (
-  state: AppStateState = INITIAL_STATE,
-  action: AppStateUpdateAction
-): AppStateState => {
+export default (state: AppStateState = INITIAL_STATE, action: AppStateUpdateAction): AppStateState => {
   switch (action.type) {
     case APP_STATE_UPDATE:
       return { ...state, ...action.payload };

@@ -1,32 +1,19 @@
 import { useMemo } from 'react';
-import { ParsedAddressAsset } from '@/entities';
 import { useLegacyNFTs } from '@/resources/nfts';
 import { useAccountSettings } from '.';
 
-export default function useCollectible(
-  initialAsset: Partial<ParsedAddressAsset>,
-  externalAddress?: string
-) {
+export default function useCollectible(uniqueId: string, externalAddress?: string) {
   const { accountAddress } = useAccountSettings();
-  const {
-    data: { nftsMap: selfNFTsMap },
-  } = useLegacyNFTs({ address: accountAddress });
-  const {
-    data: { nftsMap: externalNFTsMap },
-  } = useLegacyNFTs({
-    address: externalAddress ?? '',
-  });
+
   const isExternal = Boolean(externalAddress);
-  // Use the appropriate tokens based on if the user is viewing the
-  // current accounts tokens, or external tokens (e.g. ProfileSheet)
-  const uniqueTokensMap = useMemo(
-    () => (isExternal ? externalNFTsMap : selfNFTsMap),
-    [externalNFTsMap, isExternal, selfNFTsMap]
-  );
+  const address = isExternal ? externalAddress ?? '' : accountAddress;
 
-  const asset = initialAsset?.uniqueId
-    ? uniqueTokensMap[initialAsset.uniqueId] || initialAsset
-    : initialAsset;
+  const { data: asset } = useLegacyNFTs({
+    address,
+    config: {
+      select: data => data.nftsMap[uniqueId],
+    },
+  });
 
-  return { ...asset, isExternal };
+  return useMemo(() => ({ ...asset, isExternal }), [asset, isExternal]);
 }

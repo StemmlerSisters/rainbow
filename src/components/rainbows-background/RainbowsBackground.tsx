@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dimensions } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { SharedValue } from 'react-native-reanimated';
 import RainbowGreyNeon from '../../assets/rainbows/greyneon.png';
 import RainbowLight from '../../assets/rainbows/light.png';
 import RainbowLiquid from '../../assets/rainbows/liquid.png';
@@ -59,17 +59,13 @@ const rainbows = [
 ];
 
 interface Props {
-  shouldAnimate: Animated.SharedValue<boolean>;
+  shouldAnimate: SharedValue<boolean>;
 }
 
 const RainbowsBackgroundComponent = ({ shouldAnimate }: Props) => (
   <>
     {rainbows.map(rainbow => (
-      <SingleRainbow
-        details={rainbow}
-        key={rainbow.id}
-        shouldAnimate={shouldAnimate}
-      />
+      <SingleRainbow details={rainbow} key={rainbow.id} shouldAnimate={shouldAnimate} />
     ))}
   </>
 );

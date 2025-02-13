@@ -1,8 +1,6 @@
-import { Network } from '@/helpers/networkTypes';
 import { Asset, AssetContract, AssetType } from '@/entities';
+import { Network } from '@/state/backendNetworks/types';
 import { UniqueTokenType } from '@/utils/uniqueTokens';
-
-export type PolygonAllowlist = Record<string, boolean>;
 
 export enum NFTMarketplaceId {
   OpenSea = 'opensea',
@@ -65,7 +63,7 @@ export type NFT = {
   predominantColor: string | undefined;
   tokenId: string;
   traits: NFTTrait[];
-  type: AssetType;
+  type: AssetType.nft;
   uniqueId: string;
   uniqueTokenType: UniqueTokenType;
   video_url: string | undefined;

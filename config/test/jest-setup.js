@@ -1,5 +1,4 @@
-/* eslint-disable no-undef */
-// needed to set up global translations
+/* eslint-disable no-nested-ternary */
 import '../../src/languages';
 
 global.ios = false;
@@ -17,7 +16,7 @@ jest.mock('react-native-device-info', () => ({
   setup: () => null,
 }));
 
-jest.mock('@segment/analytics-react-native', () => ({
+jest.mock('@rudderstack/rudder-sdk-react-native', () => ({
   createClient: jest.fn(),
   identify: jest.fn(),
   reset: jest.fn(),
@@ -39,10 +38,30 @@ jest.mock('react-native-keychain', () => ({
 
 jest.mock('react-native/Libraries/EventEmitter/NativeEventEmitter');
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
+jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 
 jest.mock('react-native-permissions', () => ({
   requestNotifications: jest.fn(),
 }));
+
+jest.mock('@/utils', () => {
+  const time = {
+    seconds: seconds => seconds * 1000,
+    minutes: minutes => minutes * 60 * 1000,
+    hours: hours => hours * 60 * 60 * 1000,
+    days: days => days * 24 * 60 * 60 * 1000,
+    weeks: weeks => weeks * 7 * 24 * 60 * 60 * 1000,
+    infinity: Infinity,
+    zero: 0,
+  };
+
+  return {
+    deviceUtils: {
+      dimensions: {
+        height: 874,
+        width: 402,
+      },
+    },
+    time,
+  };
+});

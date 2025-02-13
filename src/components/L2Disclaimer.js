@@ -1,20 +1,17 @@
 import React from 'react';
 import RadialGradient from 'react-native-radial-gradient';
-import Divider from './Divider';
+import Divider from '@/components/Divider';
 import ButtonPressAnimation from './animations/ButtonPressAnimation';
-import { CoinIcon } from './coin-icon';
-import ChainBadge from './coin-icon/ChainBadge';
+import { ChainImage } from '@/components/coin-icon/ChainImage';
 import { Column, Row } from './layout';
 import { Text } from './text';
-import { isL2Asset } from '@/handlers/assets';
-import { ETH_ADDRESS, ETH_SYMBOL } from '@/references';
 import { padding, position } from '@/styles';
 import { darkModeThemeColors } from '@/styles/colors';
-import { ethereumUtils } from '@/utils';
-import { getNetworkObj } from '@/networks';
+import * as lang from '@/languages';
+import { useBackendNetworksStore } from '@/state/backendNetworks/backendNetworks';
 
 const L2Disclaimer = ({
-  assetType,
+  chainId,
   colors,
   hideDivider,
   isNft = false,
@@ -22,10 +19,8 @@ const L2Disclaimer = ({
   marginHorizontal = 19,
   onPress,
   prominent,
-  sending,
+  customText,
   symbol,
-  verb,
-  forceDarkMode,
 }) => {
   const localColors = isNft ? darkModeThemeColors : colors;
   const radialGradientProps = {
@@ -38,68 +33,37 @@ const L2Disclaimer = ({
     },
   };
 
-  const isL2 = isL2Asset(assetType);
-
   return (
     <>
-      <ButtonPressAnimation
-        marginBottom={marginBottom}
-        onPress={onPress}
-        scaleTo={0.95}
-      >
-        <Row
-          borderRadius={16}
-          marginHorizontal={marginHorizontal}
-          style={padding.object(android ? 6 : 10, 10, android ? 6 : 10, 10)}
-        >
-          <RadialGradient
-            {...radialGradientProps}
-            borderRadius={16}
-            radius={600}
-          />
+      <ButtonPressAnimation marginBottom={marginBottom} onPress={onPress} scaleTo={0.95}>
+        <Row borderRadius={16} marginHorizontal={marginHorizontal} style={padding.object(android ? 6 : 10, 10, android ? 6 : 10, 10)}>
+          <RadialGradient {...radialGradientProps} borderRadius={16} radius={600} />
           <Column justify="center">
-            {isL2 ? (
-              <ChainBadge
-                assetType={assetType}
-                position="relative"
-                size="small"
-                forceDark={forceDarkMode}
-              />
-            ) : (
-              <CoinIcon address={ETH_ADDRESS} size={20} symbol={ETH_SYMBOL} />
-            )}
+            <ChainImage chainId={chainId} position="relative" size={20} />
           </Column>
           <Column flex={1} justify="center" marginHorizontal={8}>
             <Text
-              color={
-                prominent
-                  ? colors.alpha(localColors.blueGreyDark, 0.8)
-                  : colors.alpha(localColors.blueGreyDark, 0.6)
-              }
+              color={prominent ? colors.alpha(localColors.blueGreyDark, 0.8) : colors.alpha(localColors.blueGreyDark, 0.6)}
               numberOfLines={2}
               size="smedium"
               weight={prominent ? 'heavy' : 'bold'}
             >
-              {verb ? verb : sending ? `Sending` : `This ${symbol} is`} on the{' '}
-              {getNetworkObj(ethereumUtils.getNetworkFromType(assetType)).name}{' '}
-              network
+              {customText
+                ? customText
+                : lang.t(lang.l.expanded_state.asset.l2_disclaimer, {
+                    symbol,
+                    network: useBackendNetworksStore.getState().getChainsLabel()[chainId],
+                  })}
             </Text>
           </Column>
           <Column align="end" justify="center">
-            <Text
-              align="center"
-              color={colors.alpha(localColors.blueGreyDark, 0.3)}
-              size="smedium"
-              weight="heavy"
-            >
+            <Text align="center" color={colors.alpha(localColors.blueGreyDark, 0.3)} size="smedium" weight="heavy">
               􀅵
             </Text>
           </Column>
         </Row>
       </ButtonPressAnimation>
-      {hideDivider ? null : (
-        <Divider color={localColors.rowDividerExtraLight} />
-      )}
+      {hideDivider ? null : <Divider color={localColors.rowDividerExtraLight} />}
     </>
   );
 };
