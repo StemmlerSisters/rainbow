@@ -1,269 +1,454 @@
 import { Signer } from '@ethersproject/abstract-signer';
+import { Transaction } from '@ethersproject/transactions';
 import {
-  ChainId,
-  ETH_ADDRESS,
-  fillQuote,
+  CrosschainQuote,
   Quote,
+  SwapType,
+  fillQuote,
+  getQuoteExecutionDetails,
+  getRainbowRouterContractAddress,
+  getWrappedAssetAddress,
+  getWrappedAssetMethod,
   unwrapNativeAsset,
   wrapNativeAsset,
-  WRAPPED_ASSET,
 } from '@rainbow-me/swaps';
-import { captureException } from '@sentry/react-native';
-import { toLower } from 'lodash';
+import { estimateGasWithPadding, getProvider, toHex } from '@/handlers/web3';
+import { Address } from 'viem';
+
+import { metadataPOSTClient } from '@/graphql';
+import { ChainId } from '@/state/backendNetworks/types';
+import { NewTransaction, TxHash, TransactionStatus, TransactionDirection } from '@/entities';
+import { add } from '@/helpers/utilities';
+import { addNewTransaction } from '@/state/pendingTransactions';
+import { RainbowError, logger } from '@/logger';
+
+import { gasUnits, REFERRER } from '@/references';
+import { TransactionGasParams, TransactionLegacyGasParams } from '@/__swaps__/types/gas';
+import { ActionProps, RapActionResult, RapSwapActionParameters } from '../references';
 import {
-  Rap,
-  RapExchangeActionParameters,
-  SwapActionParameters,
-} from '../common';
-import { ProtocolType, TransactionStatus, TransactionType } from '@/entities';
+  CHAIN_IDS_WITH_TRACE_SUPPORT,
+  SWAP_GAS_PADDING,
+  estimateSwapGasLimitWithFakeApproval,
+  getDefaultGasLimitForTrade,
+  overrideWithFastSpeedIfNeeded,
+  populateSwap,
+} from '../utils';
 
-import { isL2Network, toHex } from '@/handlers/web3';
-import { parseGasParamsForTransaction } from '@/parsers';
-import { additionalDataUpdateL2AssetToWatch } from '@/redux/additionalAssetsData';
-import { dataAddNewTransaction } from '@/redux/data';
-import store from '@/redux/store';
-import { greaterThan } from '@/helpers/utilities';
-import { AllowancesCache, ethereumUtils, gasUtils } from '@/utils';
-import logger from '@/utils/logger';
-import { estimateSwapGasLimit } from '@/handlers/swap';
-import { MMKV } from 'react-native-mmkv';
-import { STORAGE_IDS } from '@/model/mmkv';
+import { assetNeedsUnlocking, estimateApprove, populateApprove } from './unlock';
+import { TokenColors } from '@/graphql/__generated__/metadata';
+import { swapMetadataStorage } from '../common';
+import { AddysNetworkDetails, ParsedAsset } from '@/resources/assets/types';
+import { ExtendedAnimatedAssetWithColors } from '@/__swaps__/types/assets';
+import { Screens, TimeToSignOperation, performanceTracking } from '@/state/performance/performance';
+import { swapsStore } from '@/state/swaps/swapsStore';
+import { useBackendNetworksStore } from '@/state/backendNetworks/backendNetworks';
 
-export const swapMetadataStorage = new MMKV({
-  id: STORAGE_IDS.SWAPS_METADATA_STORAGE,
-});
-const actionName = 'swap';
+const WRAP_GAS_PADDING = 1.002;
+
+export const estimateUnlockAndSwap = async ({
+  sellAmount,
+  quote,
+  chainId,
+  assetToSell,
+}: Pick<RapSwapActionParameters<'swap'>, 'sellAmount' | 'quote' | 'chainId' | 'assetToSell'>) => {
+  const {
+    from: accountAddress,
+    sellTokenAddress,
+    allowanceNeeded,
+  } = quote as {
+    from: Address;
+    sellTokenAddress: Address;
+    allowanceNeeded: boolean;
+  };
+
+  let gasLimits: (string | number)[] = [];
+  let swapAssetNeedsUnlocking = false;
+
+  if (allowanceNeeded) {
+    swapAssetNeedsUnlocking = await assetNeedsUnlocking({
+      owner: accountAddress,
+      amount: sellAmount,
+      assetToUnlock: assetToSell,
+      spender: getRainbowRouterContractAddress(chainId),
+      chainId,
+    });
+  }
+
+  if (swapAssetNeedsUnlocking) {
+    const gasLimitFromMetadata = await estimateUnlockAndSwapFromMetadata({
+      swapAssetNeedsUnlocking,
+      chainId,
+      accountAddress,
+      sellTokenAddress,
+      quote,
+    });
+    if (gasLimitFromMetadata) {
+      return gasLimitFromMetadata;
+    }
+    const unlockGasLimit = await estimateApprove({
+      owner: accountAddress,
+      tokenAddress: sellTokenAddress,
+      spender: getRainbowRouterContractAddress(chainId),
+      chainId,
+    });
+    gasLimits = gasLimits.concat(unlockGasLimit);
+  }
+
+  const swapGasLimit = await estimateSwapGasLimit({
+    chainId,
+    requiresApprove: swapAssetNeedsUnlocking,
+    quote,
+  });
+
+  if (swapGasLimit === null || swapGasLimit === undefined || isNaN(Number(swapGasLimit))) {
+    return getDefaultGasLimitForTrade(quote, chainId);
+  }
+
+  const gasLimit = gasLimits.concat(swapGasLimit).reduce((acc, limit) => add(acc, limit), '0');
+  if (isNaN(Number(gasLimit))) {
+    return getDefaultGasLimitForTrade(quote, chainId);
+  }
+
+  return gasLimit.toString();
+};
+
+export const estimateSwapGasLimit = async ({
+  chainId,
+  requiresApprove,
+  quote,
+}: {
+  chainId: ChainId;
+  requiresApprove?: boolean;
+  quote: Quote;
+}): Promise<string> => {
+  const provider = getProvider({ chainId });
+  if (!provider || !quote) {
+    return gasUnits.basic_swap[chainId];
+  }
+
+  const isWrapNativeAsset = quote.swapType === SwapType.wrap;
+  const isUnwrapNativeAsset = quote.swapType === SwapType.unwrap;
+
+  // Wrap / Unwrap Eth
+  if (isWrapNativeAsset || isUnwrapNativeAsset) {
+    const default_estimate = isWrapNativeAsset ? gasUnits.weth_wrap : gasUnits.weth_unwrap;
+    try {
+      const gasLimit = await estimateGasWithPadding(
+        {
+          from: quote.from,
+          value: isWrapNativeAsset ? quote.buyAmount.toString() : '0',
+        },
+        getWrappedAssetMethod(isWrapNativeAsset ? 'deposit' : 'withdraw', provider, getWrappedAssetAddress(quote)),
+        isWrapNativeAsset ? [] : [quote.buyAmount.toString()],
+        provider,
+        WRAP_GAS_PADDING
+      );
+
+      if (gasLimit === null || gasLimit === undefined || isNaN(Number(gasLimit))) {
+        return quote?.defaultGasLimit || default_estimate;
+      }
+
+      return gasLimit;
+    } catch (e) {
+      return quote?.defaultGasLimit || default_estimate;
+    }
+    // Swap
+  } else {
+    try {
+      const { params, method, methodArgs } = getQuoteExecutionDetails(quote, { from: quote.from }, provider);
+
+      if (requiresApprove) {
+        if (CHAIN_IDS_WITH_TRACE_SUPPORT.includes(chainId)) {
+          try {
+            const gasLimitWithFakeApproval = await estimateSwapGasLimitWithFakeApproval(chainId, provider, quote);
+            return gasLimitWithFakeApproval;
+          } catch (e) {
+            //
+          }
+        }
+
+        return getDefaultGasLimitForTrade(quote, chainId);
+      }
+
+      const gasLimit = await estimateGasWithPadding(params, method, methodArgs, provider, SWAP_GAS_PADDING);
+
+      if (gasLimit === null || gasLimit === undefined || isNaN(Number(gasLimit))) {
+        return getDefaultGasLimitForTrade(quote, chainId);
+      }
+
+      return gasLimit;
+    } catch (error) {
+      return getDefaultGasLimitForTrade(quote, chainId);
+    }
+  }
+};
+
+export const estimateUnlockAndSwapFromMetadata = async ({
+  swapAssetNeedsUnlocking,
+  chainId,
+  accountAddress,
+  sellTokenAddress,
+  quote,
+}: {
+  swapAssetNeedsUnlocking: boolean;
+  chainId: ChainId;
+  accountAddress: Address;
+  sellTokenAddress: Address;
+  quote: Quote | CrosschainQuote;
+}) => {
+  try {
+    const approveTransaction = await populateApprove({
+      owner: accountAddress,
+      tokenAddress: sellTokenAddress,
+      spender: getRainbowRouterContractAddress(chainId as number),
+      chainId,
+    });
+
+    const provider = getProvider({ chainId });
+    const swapTransaction = await populateSwap({
+      provider,
+      quote,
+    });
+    if (
+      approveTransaction?.to &&
+      approveTransaction?.data &&
+      approveTransaction?.from &&
+      swapTransaction?.to &&
+      swapTransaction?.data &&
+      swapTransaction?.from
+    ) {
+      const transactions = swapAssetNeedsUnlocking
+        ? [
+            {
+              to: approveTransaction?.to,
+              data: approveTransaction?.data || '0x0',
+              from: approveTransaction?.from,
+              value: approveTransaction?.value?.toString() || '0x0',
+            },
+            {
+              to: swapTransaction?.to,
+              data: swapTransaction?.data || '0x0',
+              from: swapTransaction?.from,
+              value: swapTransaction?.value?.toString() || '0x0',
+            },
+          ]
+        : [
+            {
+              to: swapTransaction?.to,
+              data: swapTransaction?.data || '0x0',
+              from: swapTransaction?.from,
+              value: swapTransaction?.value?.toString() || '0x0',
+            },
+          ];
+
+      const response = await metadataPOSTClient.simulateTransactions({
+        chainId,
+        transactions,
+      });
+      const gasLimit = response.simulateTransactions
+        ?.map(res => res?.gas?.estimate)
+        .reduce((acc, limit) => (acc && limit ? add(acc, limit) : acc), '0');
+      return gasLimit;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+};
 
 export const executeSwap = async ({
   chainId,
   gasLimit,
-  maxFeePerGas,
-  maxPriorityFeePerGas,
-  gasPrice,
   nonce,
-  tradeDetails,
+  quote,
+  gasParams,
   wallet,
   permit = false,
-  flashbots = false,
 }: {
   chainId: ChainId;
-  gasLimit: string | number;
-  maxFeePerGas: string;
-  maxPriorityFeePerGas: string;
-  gasPrice: string;
+  gasLimit: string;
+  gasParams: TransactionGasParams | TransactionLegacyGasParams;
   nonce?: number;
-  tradeDetails: Quote | null;
-  wallet: Signer | null;
+  quote: Quote;
+  wallet: Signer;
   permit: boolean;
-  flashbots: boolean;
-}) => {
-  if (!wallet || !tradeDetails) return null;
-  const walletAddress = await wallet.getAddress();
+}): Promise<Transaction | null> => {
+  if (!wallet || !quote) {
+    return null;
+  }
 
-  const { sellTokenAddress, buyTokenAddress } = tradeDetails;
   const transactionParams = {
     gasLimit: toHex(gasLimit) || undefined,
-    // In case it's an L2 with legacy gas price like arbitrum
-    gasPrice,
-    // EIP-1559 like networks
-    maxFeePerGas,
-    maxPriorityFeePerGas,
-    nonce: nonce ? toHex(nonce) : undefined,
+    nonce: nonce ? toHex(`${nonce}`) : undefined,
+    ...gasParams,
   };
 
   // Wrap Eth
-  if (
-    sellTokenAddress === ETH_ADDRESS &&
-    buyTokenAddress === WRAPPED_ASSET[chainId]
-  ) {
-    logger.debug(
-      'wrapping native asset',
-      tradeDetails.buyAmount,
-      walletAddress,
-      chainId
-    );
-    return wrapNativeAsset(
-      tradeDetails.buyAmount,
-      wallet,
-      chainId,
-      transactionParams
-    );
+  if (quote.swapType === SwapType.wrap) {
+    return wrapNativeAsset(quote.buyAmount, wallet, getWrappedAssetAddress(quote), transactionParams);
     // Unwrap Weth
-  } else if (
-    sellTokenAddress === WRAPPED_ASSET[chainId] &&
-    buyTokenAddress === ETH_ADDRESS
-  ) {
-    logger.debug(
-      'unwrapping native asset',
-      tradeDetails.sellAmount,
-      walletAddress,
-      chainId
-    );
-    return unwrapNativeAsset(
-      tradeDetails.sellAmount,
-      wallet,
-      chainId,
-      transactionParams
-    );
+  } else if (quote.swapType === SwapType.unwrap) {
+    return unwrapNativeAsset(quote.sellAmount, wallet, getWrappedAssetAddress(quote), transactionParams);
     // Swap
-  } else {
-    logger.debug(
-      'FILLQUOTE',
-      tradeDetails,
-      transactionParams,
-      walletAddress,
-      permit,
-      chainId
-    );
-    return fillQuote(tradeDetails, transactionParams, wallet, permit, chainId);
+  } else if (quote.swapType === SwapType.normal) {
+    return fillQuote(quote, transactionParams, wallet, permit, chainId as number, REFERRER);
   }
+  return null;
 };
 
-const swap = async (
-  wallet: Signer,
-  currentRap: Rap,
-  index: number,
-  parameters: RapExchangeActionParameters,
-  baseNonce?: number
-): Promise<number | undefined> => {
-  logger.log(`[${actionName}] base nonce`, baseNonce, 'index:', index);
-  const {
-    inputAmount,
-    tradeDetails,
-    permit,
-    chainId,
-    requiresApprove,
-  } = parameters as SwapActionParameters;
-  const { dispatch } = store;
-  const { accountAddress } = store.getState().settings;
-  const { inputCurrency, outputCurrency } = store.getState().swap;
-  const { gasFeeParamsBySpeed, selectedGasFee } = store.getState().gas;
-  const gasParams = parseGasParamsForTransaction(selectedGasFee);
+export const swap = async ({
+  currentRap,
+  wallet,
+  index,
+  parameters,
+  baseNonce,
+  gasParams,
+  gasFeeParamsBySpeed,
+}: ActionProps<'swap'>): Promise<RapActionResult> => {
+  let gasParamsToUse = gasParams;
+
+  const { assetToSell, quote, chainId, sellAmount } = parameters;
   // if swap isn't the last action, use fast gas or custom (whatever is faster)
-  const isL2 = isL2Network(
-    ethereumUtils.getNetworkFromChainId(parameters?.chainId || ChainId.mainnet)
-  );
-  const emptyGasFee = isL2
-    ? !gasParams.gasPrice
-    : !gasParams.maxFeePerGas || !gasParams.maxPriorityFeePerGas;
 
-  if (currentRap.actions.length - 1 > index || emptyGasFee) {
-    const fastMaxFeePerGas =
-      gasFeeParamsBySpeed?.[gasUtils.FAST]?.maxFeePerGas?.amount;
-    const fastMaxPriorityFeePerGas =
-      gasFeeParamsBySpeed?.[gasUtils.FAST]?.maxPriorityFeePerGas?.amount;
-
-    if (greaterThan(fastMaxFeePerGas, gasParams?.maxFeePerGas || 0)) {
-      gasParams.maxFeePerGas = fastMaxFeePerGas;
-    }
-    if (
-      greaterThan(
-        fastMaxPriorityFeePerGas,
-        gasParams?.maxPriorityFeePerGas || 0
-      )
-    ) {
-      gasParams.maxPriorityFeePerGas = fastMaxPriorityFeePerGas;
-    }
+  if (currentRap.actions.length - 1 > index) {
+    gasParamsToUse = overrideWithFastSpeedIfNeeded({
+      gasParams,
+      chainId,
+      gasFeeParamsBySpeed,
+    });
   }
+
   let gasLimit;
   try {
-    const newGasLimit = await estimateSwapGasLimit({
-      chainId: Number(chainId),
-      requiresApprove,
-      tradeDetails,
+    gasLimit = await estimateUnlockAndSwap({
+      sellAmount,
+      assetToSell,
+      chainId,
+      quote,
     });
-    gasLimit = newGasLimit;
   } catch (e) {
-    logger.sentry(`[${actionName}] error estimateSwapGasLimit`);
-    captureException(e);
+    logger.error(new RainbowError('[raps/swap]: error estimateSwapGasLimit'), {
+      message: (e as Error)?.message,
+    });
+
     throw e;
   }
 
   let swap;
   try {
-    logger.sentry(`[${actionName}] executing rap`, {
-      ...gasParams,
-      gasLimit,
-    });
     const nonce = baseNonce ? baseNonce + index : undefined;
-
     const swapParams = {
-      ...gasParams,
+      gasParams: gasParamsToUse,
       chainId,
-      flashbots: !!parameters.flashbots,
       gasLimit,
       nonce,
-      permit: !!permit,
-      tradeDetails,
+      permit: false,
+      quote,
       wallet,
     };
-
-    // @ts-ignore
-    swap = await executeSwap(swapParams);
-    dispatch(
-      additionalDataUpdateL2AssetToWatch({
-        hash: swap?.hash || '',
-        inputCurrency,
-        network: ethereumUtils.getNetworkFromChainId(Number(chainId)),
-        outputCurrency,
-        userAddress: accountAddress,
-      })
-    );
-
-    if (permit) {
-      const walletAddress = await wallet.getAddress();
-      // Clear the allowance
-      const cacheKey = toLower(
-        `${walletAddress}|${tradeDetails.sellTokenAddress}|${tradeDetails.to}`
-      );
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-      delete AllowancesCache.cache[cacheKey];
-    }
+    swap = await performanceTracking.getState().executeFn({
+      fn: executeSwap,
+      screen: Screens.SWAPS,
+      operation: TimeToSignOperation.BroadcastTransaction,
+      metadata: {
+        degenMode: swapsStore.getState().degenMode,
+      },
+    })(swapParams);
   } catch (e) {
-    logger.sentry('Error', e);
-    const fakeError = new Error('Failed to execute swap');
-    captureException(fakeError);
+    logger.error(new RainbowError('[raps/swap]: error executeSwap'), {
+      message: (e as Error)?.message,
+    });
     throw e;
   }
 
-  logger.log(`[${actionName}] response`, swap);
+  if (!swap || !swap?.hash) throw new RainbowError('swap: error executeSwap');
 
-  const newTransaction = {
-    ...gasParams,
-    amount: inputAmount,
-    asset: inputCurrency,
-    data: swap?.data,
-    flashbots: parameters.flashbots,
-    from: accountAddress,
+  const nativePriceForAssetToBuy = (parameters.assetToBuy as ExtendedAnimatedAssetWithColors)?.nativePrice
+    ? {
+        value: (parameters.assetToBuy as ExtendedAnimatedAssetWithColors)?.nativePrice,
+      }
+    : parameters.assetToBuy.price;
+
+  const nativePriceForAssetToSell = (parameters.assetToSell as ExtendedAnimatedAssetWithColors)?.nativePrice
+    ? {
+        value: (parameters.assetToSell as ExtendedAnimatedAssetWithColors)?.nativePrice,
+      }
+    : parameters.assetToSell.price;
+
+  const chainsName = useBackendNetworksStore.getState().getChainsName();
+
+  const assetToBuy = {
+    ...parameters.assetToBuy,
+    network: chainsName[parameters.assetToBuy.chainId],
+    networks: parameters.assetToBuy.networks as Record<string, AddysNetworkDetails>,
+    colors: parameters.assetToBuy.colors as TokenColors,
+    price: nativePriceForAssetToBuy,
+  } satisfies ParsedAsset;
+
+  const updatedAssetToSell = {
+    ...parameters.assetToSell,
+    network: chainsName[parameters.assetToSell.chainId],
+    networks: parameters.assetToSell.networks as Record<string, AddysNetworkDetails>,
+    colors: parameters.assetToSell.colors as TokenColors,
+    price: nativePriceForAssetToSell,
+  } satisfies ParsedAsset;
+
+  const transaction = {
+    chainId: parameters.chainId,
+    data: parameters.quote.data,
+    from: parameters.quote.from,
+    to: parameters.quote.to as Address,
+    value: parameters.quote.value?.toString(),
+    asset: assetToBuy,
+    changes: [
+      {
+        direction: TransactionDirection.OUT,
+        asset: {
+          ...updatedAssetToSell,
+          native: undefined,
+        },
+        value: quote.sellAmount.toString(),
+      },
+      {
+        direction: TransactionDirection.IN,
+        asset: {
+          ...assetToBuy,
+          native: undefined,
+        },
+        value: quote.buyAmountMinusFees.toString(),
+      },
+    ],
     gasLimit,
-    hash: swap?.hash ?? null,
-    network: ethereumUtils.getNetworkFromChainId(Number(chainId)),
-    nonce: swap?.nonce ?? null,
-    protocol: ProtocolType.uniswap,
-    status: TransactionStatus.swapping,
-    to: swap?.to ?? null,
-    type: TransactionType.trade,
-    value: (swap && toHex(swap.value)) || undefined,
-  };
-  logger.log(`[${actionName}] adding new txn`, newTransaction);
+    hash: swap.hash as TxHash,
+    network: chainsName[parameters.chainId],
+    nonce: swap.nonce,
+    status: TransactionStatus.pending,
+    type: 'swap',
+    swap: {
+      type: SwapType.normal,
+      fromChainId: parameters.assetToSell.chainId,
+      toChainId: parameters.assetToBuy.chainId,
 
-  if (parameters.meta && swap?.hash) {
-    swapMetadataStorage.set(
-      swap.hash.toLowerCase(),
-      JSON.stringify({ type: 'swap', data: parameters.meta })
-    );
+      // TODO: Is this right?
+      isBridge:
+        parameters.assetToBuy.chainId !== parameters.assetToSell.chainId &&
+        parameters.assetToSell.address === parameters.assetToBuy.address,
+    },
+    ...gasParamsToUse,
+  } satisfies NewTransaction;
+
+  if (parameters.meta && swap.hash) {
+    swapMetadataStorage.set(swap.hash.toLowerCase(), JSON.stringify({ type: 'swap', data: parameters.meta }));
   }
 
-  dispatch(
-    dataAddNewTransaction(
-      newTransaction,
-      accountAddress,
-      false,
-      // @ts-ignore
-      wallet?.provider
-    )
-  );
-  return swap?.nonce;
-};
+  addNewTransaction({
+    address: parameters.quote.from,
+    chainId: parameters.chainId,
+    transaction,
+  });
 
-export { swap };
+  return {
+    nonce: swap.nonce,
+    hash: swap.hash,
+  };
+};

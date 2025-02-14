@@ -110,6 +110,8 @@ export const globalColors = {
   blueGrey80: '#5F6670',
   blueGrey90: '#3C4047',
   blueGrey100: '#242529',
+
+  darkGrey: '#9CA6B1',
 };
 
 export const deprecatedColors = {
@@ -178,6 +180,8 @@ export type BackgroundColor =
   | 'surfaceSecondaryElevated'
   | 'fill'
   | 'fillSecondary'
+  | 'fillTertiary'
+  | 'fillQuaternary'
   | 'blue'
   | 'green'
   | 'red'
@@ -196,10 +200,7 @@ export type BackgroundColorValue = {
   mode: ColorMode;
 };
 
-export const backgroundColors: Record<
-  BackgroundColor,
-  BackgroundColorValue | ContextualColorValue<BackgroundColorValue>
-> = {
+export const backgroundColors: Record<BackgroundColor, ContextualColorValue<BackgroundColorValue>> = {
   'surfacePrimary': {
     light: {
       color: globalColors.white100,
@@ -257,6 +258,26 @@ export const backgroundColors: Record<
     },
     dark: {
       color: globalColors.white20,
+      mode: 'dark',
+    },
+  },
+  'fillTertiary': {
+    light: {
+      color: globalColors.grey20,
+      mode: 'light',
+    },
+    dark: {
+      color: 'rgba(245, 248, 255, 0.08)',
+      mode: 'dark',
+    },
+  },
+  'fillQuaternary': {
+    light: {
+      color: globalColors.grey10,
+      mode: 'light',
+    },
+    dark: {
+      color: 'rgba(245, 248, 255, 0.04)',
       mode: 'dark',
     },
   },
@@ -379,8 +400,14 @@ export const backgroundColors: Record<
     },
   },
   'swap (Deprecated)': {
-    color: deprecatedColors.swapPurple,
-    mode: 'darkTinted',
+    dark: {
+      color: deprecatedColors.swapPurple,
+      mode: 'darkTinted',
+    },
+    light: {
+      color: deprecatedColors.swapPurple,
+      mode: 'darkTinted',
+    },
   },
 };
 
@@ -398,6 +425,8 @@ export type ForegroundColor =
   | 'yellow'
   | 'fill'
   | 'fillSecondary'
+  | 'fillTertiary'
+  | 'fillQuaternary'
   | 'scrim'
   | 'scrimSecondary'
   | 'scrimTertiary'
@@ -427,16 +456,20 @@ export type ForegroundColor =
   | 'secondary60 (Deprecated)'
   | 'secondary70 (Deprecated)'
   | 'secondary80 (Deprecated)'
-  | 'swap (Deprecated)';
+  | 'swap (Deprecated)'
+  | 'mainnet'
+  | 'arbitrum'
+  | 'optimism'
+  | 'polygon'
+  | 'base'
+  | 'zora'
+  | 'bsc'
+  | 'avalanche'
+  | 'blast'
+  | 'degen';
 
-function selectBackgroundAsForeground(
-  backgroundName: BackgroundColor
-): string | ContextualColorValue<string> {
+function selectBackgroundAsForeground(backgroundName: BackgroundColor): ContextualColorValue<string> {
   const bg = backgroundColors[backgroundName];
-
-  if ('color' in bg) {
-    return bg.color;
-  }
 
   return {
     dark: bg.dark.color,
@@ -446,10 +479,7 @@ function selectBackgroundAsForeground(
   };
 }
 
-export const foregroundColors: Record<
-  ForegroundColor,
-  string | ContextualColorValue<string>
-> = {
+export const foregroundColors: Record<ForegroundColor, ContextualColorValue<string>> = {
   'label': {
     light: globalColors.grey100,
     dark: globalColors.white100,
@@ -475,6 +505,8 @@ export const foregroundColors: Record<
   'yellow': selectBackgroundAsForeground('yellow'),
   'fill': selectBackgroundAsForeground('fill'),
   'fillSecondary': selectBackgroundAsForeground('fillSecondary'),
+  'fillTertiary': selectBackgroundAsForeground('fillTertiary'),
+  'fillQuaternary': selectBackgroundAsForeground('fillQuaternary'),
   'scrim': {
     light: 'rgba(0, 0, 0, 0.2)',
     dark: 'rgba(0, 0, 0, 0.4)',
@@ -602,12 +634,58 @@ export const foregroundColors: Record<
     darkTinted: deprecatedColors.white80,
     light: deprecatedColors.grey80,
   },
-  'shadowNear': globalColors.grey100,
+  'shadowNear': {
+    light: globalColors.grey100,
+    dark: globalColors.grey100,
+  },
   'shadowFar': {
     dark: globalColors.grey100,
     light: '#25292E',
   },
-  'swap (Deprecated)': deprecatedColors.swapPurple,
+  'swap (Deprecated)': {
+    light: deprecatedColors.swapPurple,
+    dark: deprecatedColors.swapPurple,
+  },
+  'mainnet': {
+    light: '#6D6D6D',
+    dark: '#999BA1',
+  },
+  'arbitrum': {
+    light: '#1690E4',
+    dark: '#52B8FF',
+  },
+  'optimism': {
+    light: '#FF4040',
+    dark: '#FF8A8A',
+  },
+  'polygon': {
+    light: '#8247E5',
+    dark: '#BE97FF',
+  },
+  'base': {
+    light: '#0052FF',
+    dark: '#3979FF',
+  },
+  'zora': {
+    light: '#2B5DF0',
+    dark: '#6183F0',
+  },
+  'bsc': {
+    light: '#EBAF09',
+    dark: '#FFDA66',
+  },
+  'avalanche': {
+    light: '#EBAF09',
+    dark: '#FF5D5E',
+  },
+  'blast': {
+    light: '#FCFC06',
+    dark: '#FCFC06',
+  },
+  'degen': {
+    light: '#A36EFD',
+    dark: '#A36EFD',
+  },
 };
 
 /**
@@ -615,10 +693,7 @@ export const foregroundColors: Record<
  * resolves the value based on the requested color mode. This is useful because
  * some color modes can inherit from others, e.g. `"dark"` and `"darkTinted"`.
  */
-export function getValueForColorMode<Value>(
-  value: Value | ContextualColorValue<Value>,
-  colorMode: ColorMode
-): Value {
+export function getValueForColorMode<Value>(value: Value | ContextualColorValue<Value>, colorMode: ColorMode): Value {
   if (typeof value === 'object' && value !== null && 'light' in value) {
     if (colorMode === 'darkTinted') {
       return value.darkTinted ?? value.dark;
@@ -648,10 +723,6 @@ export type Palette = {
 function createPalette(colorMode: ColorMode): Palette {
   return {
     backgroundColors: mapValues(backgroundColors, value => {
-      if ('color' in value) {
-        return value;
-      }
-
       if (colorMode === 'darkTinted') {
         return value.darkTinted ?? value.dark;
       }
@@ -662,9 +733,7 @@ function createPalette(colorMode: ColorMode): Palette {
 
       return value[colorMode];
     }),
-    foregroundColors: mapValues(foregroundColors, value =>
-      getValueForColorMode(value, colorMode)
-    ),
+    foregroundColors: mapValues(foregroundColors, value => getValueForColorMode(value, colorMode)),
   };
 }
 
@@ -675,9 +744,7 @@ export const palettes: Record<ColorMode, Palette> = {
   lightTinted: createPalette('lightTinted'),
 };
 
-function selectForegroundColors<
-  SelectedColors extends readonly (ForegroundColor | 'accent')[]
->(...colors: SelectedColors): SelectedColors {
+function selectForegroundColors<SelectedColors extends readonly (ForegroundColor | 'accent')[]>(...colors: SelectedColors): SelectedColors {
   return colors;
 }
 
@@ -705,21 +772,22 @@ export const textColors = selectForegroundColors(
   'secondary50 (Deprecated)',
   'secondary60 (Deprecated)',
   'secondary70 (Deprecated)',
-  'secondary80 (Deprecated)'
+  'secondary80 (Deprecated)',
+  'mainnet',
+  'arbitrum',
+  'optimism',
+  'polygon',
+  'base',
+  'zora',
+  'bsc',
+  'avalanche',
+  'blast',
+  'degen'
 );
-export type TextColor = typeof textColors[number];
+export type TextColor = (typeof textColors)[number];
 
-export const shadowColors = selectForegroundColors(
-  'accent',
-  'blue',
-  'green',
-  'red',
-  'purple',
-  'pink',
-  'orange',
-  'yellow'
-);
-export type ShadowColor = typeof shadowColors[number];
+export const shadowColors = selectForegroundColors('accent', 'blue', 'green', 'red', 'purple', 'pink', 'orange', 'yellow');
+export type ShadowColor = (typeof shadowColors)[number];
 
 export const separatorColors = selectForegroundColors(
   'separator',
@@ -731,4 +799,4 @@ export const separatorColors = selectForegroundColors(
   'divider80 (Deprecated)',
   'divider100 (Deprecated)'
 );
-export type SeparatorColor = typeof separatorColors[number];
+export type SeparatorColor = (typeof separatorColors)[number];

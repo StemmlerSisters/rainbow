@@ -1,12 +1,6 @@
 import { AddressZero } from '@ethersproject/constants';
 import { isEmpty } from 'lodash';
-import {
-  createNewENSAction,
-  createNewRap,
-  ENSActionParameters,
-  RapActionTypes,
-  RapENSAction,
-} from './common';
+import { createNewENSAction, createNewENSRap, ENSActionParameters, RapENSAction, ENSRapActionType } from './common';
 import { Records } from '@/entities';
 import {
   formatRecordsForTransaction,
@@ -16,128 +10,87 @@ import {
 } from '@/handlers/ens';
 import { ENS_RECORDS } from '@/helpers/ens';
 
-export const createSetRecordsENSRap = async (
-  ensActionParameters: ENSActionParameters
-) => {
+export const createSetRecordsENSRap = async (ensActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
 
-  const ensRegistrationRecords = formatRecordsForTransaction(
-    ensActionParameters.records
-  );
+  const ensRegistrationRecords = formatRecordsForTransaction(ensActionParameters.records);
   const validRecords = recordsForTransactionAreValid(ensRegistrationRecords);
   if (validRecords) {
     const txType = getTransactionTypeForRecords(ensRegistrationRecords);
     if (txType) {
       const rapActionType = getRapActionTypeForTxType(txType);
       if (rapActionType) {
-        const recordsAction = createNewENSAction(
-          rapActionType,
-          ensActionParameters
-        );
+        const recordsAction = createNewENSAction(rapActionType, ensActionParameters);
         actions = actions.concat(recordsAction);
       }
     }
   }
 
   if (ensActionParameters.setReverseRecord) {
-    const setName = createNewENSAction(
-      RapActionTypes.setNameENS,
-      ensActionParameters
-    );
+    const setName = createNewENSAction(ENSRapActionType.setNameENS, ensActionParameters);
     actions = actions.concat(setName);
   }
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };
 
-export const createRegisterENSRap = async (
-  ensActionParameters: ENSActionParameters
-) => {
+export const createRegisterENSRap = async (ensActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
 
-  const register = createNewENSAction(
-    RapActionTypes.registerWithConfigENS,
-    ensActionParameters
-  );
+  const register = createNewENSAction(ENSRapActionType.registerWithConfigENS, ensActionParameters);
   actions = actions.concat(register);
 
-  const ensRegistrationRecords = formatRecordsForTransaction(
-    ensActionParameters.records
-  );
+  const ensRegistrationRecords = formatRecordsForTransaction(ensActionParameters.records);
   const validRecords = recordsForTransactionAreValid(ensRegistrationRecords);
   if (validRecords) {
     const txType = getTransactionTypeForRecords(ensRegistrationRecords);
     if (txType) {
       const rapActionType = getRapActionTypeForTxType(txType);
       if (rapActionType) {
-        const recordsAction = createNewENSAction(
-          rapActionType,
-          ensActionParameters
-        );
+        const recordsAction = createNewENSAction(rapActionType, ensActionParameters);
         actions = actions.concat(recordsAction);
       }
     }
   }
 
   if (ensActionParameters.setReverseRecord) {
-    const setName = createNewENSAction(
-      RapActionTypes.setNameENS,
-      ensActionParameters
-    );
+    const setName = createNewENSAction(ENSRapActionType.setNameENS, ensActionParameters);
     actions = actions.concat(setName);
   }
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };
 
-export const createRenewENSRap = async (
-  ENSActionParameters: ENSActionParameters
-) => {
+export const createRenewENSRap = async (ENSActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
   // // commit rap
-  const commit = createNewENSAction(
-    RapActionTypes.renewENS,
-    ENSActionParameters
-  );
+  const commit = createNewENSAction(ENSRapActionType.renewENS, ENSActionParameters);
   actions = actions.concat(commit);
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };
 
-export const createSetNameENSRap = async (
-  ENSActionParameters: ENSActionParameters
-) => {
+export const createSetNameENSRap = async (ENSActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
   // // commit rap
-  const commit = createNewENSAction(
-    RapActionTypes.setNameENS,
-    ENSActionParameters
-  );
+  const commit = createNewENSAction(ENSRapActionType.setNameENS, ENSActionParameters);
   actions = actions.concat(commit);
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };
 
-export const createTransferENSRap = async (
-  ensActionParameters: ENSActionParameters
-) => {
+export const createTransferENSRap = async (ensActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
 
-  const {
-    clearRecords,
-    records,
-    setAddress,
-    transferControl,
-    toAddress,
-  } = ensActionParameters;
+  const { clearRecords, records, setAddress, transferControl, toAddress } = ensActionParameters;
 
   if (clearRecords) {
     const emptyRecords = Object.keys(records ?? {}).reduce(
@@ -158,9 +111,7 @@ export const createTransferENSRap = async (
     }
 
     const ensRegistrationRecords = formatRecordsForTransaction(newRecords);
-    const validRecords =
-      !isEmpty(emptyRecords) &&
-      recordsForTransactionAreValid(ensRegistrationRecords);
+    const validRecords = !isEmpty(emptyRecords) && recordsForTransactionAreValid(ensRegistrationRecords);
     if (validRecords) {
       const txType = getTransactionTypeForRecords(ensRegistrationRecords);
       if (txType) {
@@ -175,14 +126,14 @@ export const createTransferENSRap = async (
       }
     }
   } else if (setAddress) {
-    const setName = createNewENSAction(RapActionTypes.setAddrENS, {
+    const setName = createNewENSAction(ENSRapActionType.setAddrENS, {
       ...ensActionParameters,
       records: { ETH: toAddress },
     });
     actions = actions.concat(setName);
   }
   if (transferControl && toAddress) {
-    const transferControl = createNewENSAction(RapActionTypes.reclaimENS, {
+    const transferControl = createNewENSAction(ENSRapActionType.reclaimENS, {
       ...ensActionParameters,
       toAddress,
     });
@@ -190,22 +141,17 @@ export const createTransferENSRap = async (
   }
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };
 
-export const createCommitENSRap = async (
-  ENSActionParameters: ENSActionParameters
-) => {
+export const createCommitENSRap = async (ENSActionParameters: ENSActionParameters) => {
   let actions: RapENSAction[] = [];
   // // commit rap
-  const commit = createNewENSAction(
-    RapActionTypes.commitENS,
-    ENSActionParameters
-  );
+  const commit = createNewENSAction(ENSRapActionType.commitENS, ENSActionParameters);
   actions = actions.concat(commit);
 
   // create the overall rap
-  const newRap = createNewRap(actions);
+  const newRap = createNewENSRap(actions);
   return newRap;
 };

@@ -415,12 +415,56 @@ export const typeHierarchy = {
         ios: 0,
       },
     },
+    'icon 9px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 9,
+      letterSpacing: 0,
+      lineHeight: 12,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 10px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 10,
+      letterSpacing: 0,
+      lineHeight: 12,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 11px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 11,
+      letterSpacing: 0,
+      lineHeight: 13,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
     'icon 12px': {
       // ⚠️ IMPORTANT: When modifying these values,
       // please read the note at the top of this file.
       fontSize: 12,
       letterSpacing: 0,
       lineHeight: 14,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 13px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 13,
+      letterSpacing: 0,
+      lineHeight: 18,
       marginCorrection: {
         android: 0,
         ios: 0,
@@ -437,10 +481,43 @@ export const typeHierarchy = {
         ios: 0,
       },
     },
+    'icon 15px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 15,
+      letterSpacing: 0,
+      lineHeight: 20,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
     'icon 16px': {
       // ⚠️ IMPORTANT: When modifying these values,
       // please read the note at the top of this file.
       fontSize: 16,
+      letterSpacing: 0,
+      lineHeight: 22,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 17px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 17,
+      letterSpacing: 0,
+      lineHeight: 22,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 18px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 18,
       letterSpacing: 0,
       lineHeight: 22,
       marginCorrection: {
@@ -471,9 +548,33 @@ export const typeHierarchy = {
       },
     },
     'icon 23px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
       fontSize: 23,
       letterSpacing: 0,
       lineHeight: 27,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 26px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 26,
+      letterSpacing: 0,
+      lineHeight: 32,
+      marginCorrection: {
+        android: 0,
+        ios: 0,
+      },
+    },
+    'icon 28px': {
+      // ⚠️ IMPORTANT: When modifying these values,
+      // please read the note at the top of this file.
+      fontSize: 28,
+      letterSpacing: 0,
+      lineHeight: 33,
       marginCorrection: {
         android: 0,
         ios: 0,

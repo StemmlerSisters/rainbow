@@ -1,25 +1,11 @@
-const {
-  DetoxCircusEnvironment,
-  SpecReporter,
-  WorkerAssignReporter,
-  // eslint-disable-next-line import/no-commonjs
-} = require('detox/runners/jest-circus');
+/* eslint-disable @typescript-eslint/no-var-requires */
+const { DetoxCircusEnvironment } = require('detox/runners/jest');
 
 class CustomDetoxEnvironment extends DetoxCircusEnvironment {
   constructor(config, context) {
     super(config, context);
-
-    // Can be safely removed, if you are content with the default value (=300000ms)
-    this.initTimeout = 300000;
-
-    // This takes care of generating status logs on a per-spec basis. By default, Jest only reports at file-level.
-    // This is strictly optional.
-    this.registerListeners({
-      SpecReporter,
-      WorkerAssignReporter,
-    });
+    this.launchAppTimeout = 120_000;
+    this.initTimeout = 120_000;
   }
 }
-
-// eslint-disable-next-line import/no-commonjs
 module.exports = CustomDetoxEnvironment;

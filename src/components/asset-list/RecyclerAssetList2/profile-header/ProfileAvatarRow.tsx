@@ -1,21 +1,11 @@
 import * as React from 'react';
 import { Animated as RNAnimated, Text as NativeText } from 'react-native';
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useDerivedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useDerivedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { ButtonPressAnimation } from '@/components/animations';
 import { ImgixImage } from '@/components/images';
 import Skeleton from '@/components/skeleton/Skeleton';
 import { AccentColorProvider, Box, Cover, useColorMode } from '@/design-system';
-import {
-  useAccountProfile,
-  useLatestCallback,
-  useOnAvatarPress,
-} from '@/hooks';
+import { useAccountProfile, useLatestCallback, useOnAvatarPress } from '@/hooks';
 import { useTheme } from '@/theme';
 import { getFirstGrapheme } from '@/utils';
 import ContextMenu from '@/components/native-context-menu/contextMenu';
@@ -29,21 +19,13 @@ export const ProfileAvatarRowHeight = 80;
 export const ProfileAvatarRowTopInset = 24;
 export const ProfileAvatarSize = 80;
 
-export function ProfileAvatarRow({
-  size = ProfileAvatarSize,
-}: {
-  size?: number;
-}) {
+export function ProfileAvatarRow({ size = ProfileAvatarSize }: { size?: number }) {
   // ////////////////////////////////////////////////////
   // Account
 
   const { accountSymbol, accountColor, accountImage } = useAccountProfile();
 
-  const {
-    avatarContextMenuConfig,
-    onAvatarPressProfile,
-    onSelectionCallback,
-  } = useOnAvatarPress({ screenType: 'wallet' });
+  const { avatarContextMenuConfig, onAvatarPressProfile, onSelectionCallback } = useOnAvatarPress({ screenType: 'wallet' });
 
   const dominantColor = usePersistentDominantColorFromImage(accountImage);
 
@@ -53,9 +35,7 @@ export function ProfileAvatarRow({
   const ContextMenuButton = onAvatarPressProfile ? React.Fragment : ContextMenu;
 
   const handlePressMenuItem = useLatestCallback((e: any) => {
-    const index = avatarContextMenuConfig.menuItems?.findIndex(
-      item => item.actionKey === e.nativeEvent.actionKey
-    );
+    const index = avatarContextMenuConfig?.menuItems?.findIndex(item => item && item.actionKey === e.nativeEvent.actionKey);
     onSelectionCallback(index);
   });
 
@@ -81,32 +61,20 @@ export function ProfileAvatarRow({
   const animatedStyle = React.useMemo(
     () => ({
       opacity: position!.interpolate({
-        inputRange: [
-          -insets.top,
-          IS_ANDROID ? 0 : -insets.top + 1,
-          navbarHeight + insets.top,
-        ],
+        inputRange: [-insets.top, IS_ANDROID ? 0 : -insets.top + 1, navbarHeight],
         outputRange: [1, 1, 0],
       }),
       transform: [
         {
           translateY: position!.interpolate({
-            inputRange: [
-              -insets.top,
-              IS_ANDROID ? 0 : -insets.top + 1,
-              navbarHeight + insets.top,
-            ],
+            inputRange: [-insets.top, -insets.top + 1, navbarHeight],
             outputRange: [0, 0, 12],
           }),
         },
         {
           scale: position!.interpolate({
-            inputRange: [
-              -insets.top,
-              IS_ANDROID ? 0 : -insets.top + 1,
-              navbarHeight + insets.top,
-            ],
-            outputRange: [1, 1, 0.8],
+            inputRange: [-insets.top, IS_ANDROID ? 0 : -insets.top + 1, navbarHeight],
+            outputRange: [1, 1, 0.5],
           }),
         },
       ],
@@ -148,19 +116,10 @@ export function ProfileAvatarRow({
 
   return (
     <AccentColorProvider color={accentColor}>
-      <RNAnimated.View style={animatedStyle}>
-        <Animated.View style={[expandStyle]}>
-          <ContextMenuButton
-            // @ts-expect-error - JS component
-            menuConfig={avatarContextMenuConfig}
-            onPressMenuItem={handlePressMenuItem}
-          >
-            <ButtonPressAnimation
-              onPress={onAvatarPressProfile}
-              scale={0.8}
-              testID="avatar-button"
-              overflowMargin={20}
-            >
+      <RNAnimated.View style={[animatedStyle, { zIndex: 500 }]}>
+        <Animated.View style={expandStyle}>
+          <ContextMenuButton menuConfig={avatarContextMenuConfig} onPressMenuItem={handlePressMenuItem}>
+            <ButtonPressAnimation onPress={onAvatarPressProfile} scale={0.8} testID="avatar-button" overflowMargin={20}>
               <Box
                 alignItems="center"
                 background="accent"
@@ -184,15 +143,13 @@ export function ProfileAvatarRow({
                               y: 8,
                               blur: 24,
                               opacity: 0.3,
-                              color:
-                                colorMode === 'dark' ? 'shadowFar' : 'accent',
+                              color: colorMode === 'dark' ? 'shadowFar' : 'accent',
                             },
                           ],
                           android: {
                             elevation: 30,
                             opacity: 0.8,
-                            color:
-                              colorMode === 'dark' ? 'shadowFar' : 'accent',
+                            color: colorMode === 'dark' ? 'shadowFar' : 'accent',
                           },
                         },
                       }
@@ -208,12 +165,7 @@ export function ProfileAvatarRow({
                     <Cover alignHorizontal="center">
                       <Box height={{ custom: size }} width="full">
                         <Skeleton animated>
-                          <Box
-                            background="body (Deprecated)"
-                            borderRadius={size / 2}
-                            height={{ custom: size }}
-                            width={{ custom: size }}
-                          />
+                          <Box background="body (Deprecated)" borderRadius={size / 2} height={{ custom: size }} width={{ custom: size }} />
                         </Skeleton>
                       </Box>
                     </Cover>
@@ -246,24 +198,15 @@ export function EmojiAvatar({ size }: { size: number }) {
   const { colors } = useTheme();
   const { accountColor, accountSymbol } = useAccountProfile();
 
-  const accentColor =
-    accountColor !== undefined
-      ? colors.avatarBackgrounds[accountColor]
-      : colors.skeleton;
+  const accentColor = accountColor !== undefined ? colors.avatarBackgrounds[accountColor] : colors.skeleton;
 
   return (
     <AccentColorProvider color={accentColor}>
-      <Box
-        background="accent"
-        borderRadius={size / 2}
-        height={{ custom: size }}
-        width={{ custom: size }}
-      >
+      <Box background="accent" borderRadius={size / 2} height={{ custom: size }} width={{ custom: size }}>
         <Cover alignHorizontal="center" alignVertical="center">
           <Box>
             <NativeText style={{ fontSize: ios ? 48 : 36, color: 'white' }}>
-              {typeof accountSymbol === 'string' &&
-                getFirstGrapheme(accountSymbol.toUpperCase())}
+              {typeof accountSymbol === 'string' && getFirstGrapheme(accountSymbol.toUpperCase())}
             </NativeText>
           </Box>
         </Cover>

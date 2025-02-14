@@ -9,10 +9,12 @@ import { Box, Inline, Stack, Text } from '@/design-system';
 import { ImgixImage } from '@/components/images';
 import { useTheme } from '@/theme';
 import { ImageSourcePropType } from 'react-native';
+import { Width } from '@/design-system/layout/size';
+import { colors } from '@/styles';
 
 interface ImageIconProps {
   size?: number;
-  source: ImageSourcePropType | Source;
+  source: ImageSourcePropType | Source | undefined;
 }
 
 const ImageIcon = ({ size = 60, source }: ImageIconProps) => (
@@ -37,23 +39,17 @@ interface TextIconProps {
   isEmoji?: boolean;
 }
 
-const TextIcon = ({
-  colorOverride,
-  icon,
-  disabled,
-  isLink,
-  isEmoji = false,
-}: TextIconProps) => (
+const TextIcon = ({ colorOverride, icon, disabled, isLink, isEmoji = false }: TextIconProps) => (
   <Box paddingLeft={{ custom: isEmoji ? 7 : 0 }}>
     <Text
       color={
         colorOverride
           ? { custom: colorOverride }
           : disabled
-          ? 'secondary60 (Deprecated)'
-          : isLink
-          ? 'action (Deprecated)'
-          : 'primary (Deprecated)'
+            ? 'secondary60 (Deprecated)'
+            : isLink
+              ? 'action (Deprecated)'
+              : 'primary (Deprecated)'
       }
       containsEmoji
       size="18px / 27px (Deprecated)"
@@ -69,11 +65,7 @@ interface SelectionProps {
 }
 
 const Selection = ({ children }: SelectionProps) => (
-  <Text
-    color="secondary60 (Deprecated)"
-    size="18px / 27px (Deprecated)"
-    weight="semibold"
-  >
+  <Text color="secondary60 (Deprecated)" size="18px / 27px (Deprecated)" weight="semibold">
     {children}
   </Text>
 );
@@ -117,16 +109,19 @@ interface TitleProps {
   weight?: 'regular' | 'medium' | 'semibold' | 'bold' | 'heavy';
   disabled?: boolean;
   isLink?: boolean;
+  customColor?: string;
 }
 
-const Title = ({ text, weight = 'semibold', disabled, isLink }: TitleProps) => (
+const Title = ({ text, weight = 'semibold', disabled, isLink, customColor }: TitleProps) => (
   <Text
     color={
       disabled
         ? 'secondary60 (Deprecated)'
-        : isLink
-        ? 'action (Deprecated)'
-        : 'primary (Deprecated)'
+        : customColor
+          ? { custom: customColor }
+          : isLink
+            ? 'action (Deprecated)'
+            : 'primary (Deprecated)'
     }
     containsEmoji
     size="18px / 27px (Deprecated)"
@@ -140,15 +135,18 @@ const Title = ({ text, weight = 'semibold', disabled, isLink }: TitleProps) => (
 interface LabelProps {
   text: string;
   warn?: boolean;
+  color?: string;
+  testID?: string;
 }
 
-const Label = ({ text, warn }: LabelProps) => {
+const Label = ({ text, warn, color, testID }: LabelProps) => {
   const { colors } = useTheme();
   return (
     <Text
-      color={warn ? { custom: colors.orangeLight } : 'secondary60 (Deprecated)'}
+      color={color ? { custom: color } : warn ? { custom: colors.orangeLight } : 'secondary60 (Deprecated)'}
       size="14px / 19px (Deprecated)"
       weight="medium"
+      testID={testID}
     >
       {text}
     </Text>
@@ -158,9 +156,10 @@ const Label = ({ text, warn }: LabelProps) => {
 interface MenuItemProps {
   rightComponent?: React.ReactNode;
   leftComponent?: React.ReactNode;
-  size: 52 | 60;
+  size?: 52 | 60 | number;
   hasRightArrow?: boolean;
   onPress?: () => void;
+  width?: Width;
   titleComponent: React.ReactNode;
   labelComponent?: React.ReactNode;
   disabled?: boolean;
@@ -180,19 +179,20 @@ const MenuItem = ({
   disabled,
   hasChevron,
   hasSfSymbol,
+  width,
   testID,
 }: MenuItemProps) => {
   const { colors } = useTheme();
 
   const Item = () => (
     <Box
-      height={{ custom: size }}
+      height={size ? { custom: size } : 'full'}
       justifyContent="center"
       paddingHorizontal={{ custom: 16 }}
       testID={disabled ? testID : undefined}
       width="full"
     >
-      <Inline alignHorizontal="justify" alignVertical="center" wrap={false}>
+      <Inline alignHorizontal="justify" alignVertical="center">
         <Box flexShrink={1}>
           <Inline alignVertical="center" wrap={false}>
             {leftComponent && (
@@ -208,7 +208,7 @@ const MenuItem = ({
             )}
 
             <Box flexShrink={1}>
-              <Stack space="8px">
+              <Stack width={width} space="8px">
                 {titleComponent}
                 {labelComponent}
               </Stack>

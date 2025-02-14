@@ -1,19 +1,13 @@
-import { arcClient, arcDevClient } from '@/graphql';
+import { arcClient } from '@/graphql';
 import { Navigation } from '@/navigation';
 import Routes from '@/navigation/routesNames';
-import { IS_DEV } from '@/env';
 import { logger } from '@/logger';
 
 export type PoapMintError = 'LIMIT_EXCEEDED' | 'EVENT_EXPIRED' | 'UNKNOWN';
 
-export const getPoapAndOpenSheetWithSecretWord = async (
-  secretWord: string,
-  goBack: boolean
-) => {
+export const getPoapAndOpenSheetWithSecretWord = async (secretWord: string, goBack = false) => {
   try {
-    const client = IS_DEV ? arcDevClient : arcClient;
-
-    const event = await client.getPoapEventBySecretWord({
+    const event = await arcClient.getPoapEventBySecretWord({
       secretWord,
     });
 
@@ -26,18 +20,13 @@ export const getPoapAndOpenSheetWithSecretWord = async (
       });
     }
   } catch (e) {
-    logger.warn('Error getting POAP with secret word');
+    logger.warn('[poaps]: Error getting POAP with secret word');
   }
 };
 
-export const getPoapAndOpenSheetWithQRHash = async (
-  qrHash: string,
-  goBack: boolean
-) => {
+export const getPoapAndOpenSheetWithQRHash = async (qrHash: string, goBack = false) => {
   try {
-    const client = IS_DEV ? arcDevClient : arcClient;
-
-    const event = await client.getPoapEventByQrHash({
+    const event = await arcClient.getPoapEventByQrHash({
       qrHash,
     });
 
@@ -50,6 +39,6 @@ export const getPoapAndOpenSheetWithQRHash = async (
       });
     }
   } catch {
-    logger.warn('Error getting POAP with qrHash');
+    logger.warn('[poaps]: Error getting POAP with qrHash');
   }
 };

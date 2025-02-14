@@ -12,10 +12,9 @@ import { useNavigation } from '@/navigation';
 import { logger } from '@/logger';
 import { DebugContext } from '@/logger/debugContext';
 // eslint-disable-next-line no-restricted-imports
-import { RouteProp, useRoute } from '@react-navigation/core';
+import { RouteProp, useRoute } from '@react-navigation/native';
 import { atom, useRecoilState } from 'recoil';
 import { MMKV } from 'react-native-mmkv';
-import { Dimensions } from 'react-native';
 
 export const ledgerStorage = new MMKV({
   id: 'ledgerStorage',
@@ -24,7 +23,7 @@ export const ledgerStorage = new MMKV({
 export const HARDWARE_TX_ERROR_KEY = 'hardwareTXError';
 
 export const setHardwareTXError = (value: boolean) => {
-  logger.info(`setHardwareTXError`, { value });
+  logger.warn(`[HardwareWalletTxNavigator]: setHardwareTXError`, { value });
   ledgerStorage.set(HARDWARE_TX_ERROR_KEY, value);
 };
 
@@ -64,21 +63,14 @@ export const HardwareWalletTxNavigator = () => {
 
   const { navigate } = useNavigation();
 
-  const deviceId = selectedWallet?.deviceId;
+  const deviceId = selectedWallet.deviceId ?? '';
   const [isReady, setIsReady] = useRecoilState(LedgerIsReadyAtom);
-  const [readyForPolling, setReadyForPolling] = useRecoilState(
-    readyForPollingAtom
-  );
-  const [triggerPollerCleanup, setTriggerPollerCleanup] = useRecoilState(
-    triggerPollerCleanupAtom
-  );
+  const [readyForPolling, setReadyForPolling] = useRecoilState(readyForPollingAtom);
+  const [triggerPollerCleanup, setTriggerPollerCleanup] = useRecoilState(triggerPollerCleanupAtom);
 
   const errorCallback = useCallback(
     (errorType: LEDGER_ERROR_CODES) => {
-      if (
-        errorType === LEDGER_ERROR_CODES.NO_ETH_APP ||
-        errorType === LEDGER_ERROR_CODES.OFF_OR_LOCKED
-      ) {
+      if (errorType === LEDGER_ERROR_CODES.NO_ETH_APP || errorType === LEDGER_ERROR_CODES.OFF_OR_LOCKED) {
         navigate(Routes.PAIR_HARDWARE_WALLET_ERROR_SHEET, {
           errorType,
           deviceId,
@@ -91,14 +83,14 @@ export const HardwareWalletTxNavigator = () => {
   );
 
   const successCallback = useCallback(() => {
-    logger.debug('[LedgerTx] - submitting tx', {}, DebugContext.ledger);
+    logger.debug('[HardwareWalletTxNavigator]: submitting tx', {});
     if (!isReady) {
       setReadyForPolling(false);
       setIsReady(true);
       setHardwareTXError(false);
       submit();
     } else {
-      logger.debug('[LedgerTx] - already submitted', {}, DebugContext.ledger);
+      logger.debug('[HardwareWalletTxNavigator]: already submitted', {});
     }
   }, [isReady, setIsReady, setReadyForPolling, submit]);
 
@@ -132,14 +124,8 @@ export const HardwareWalletTxNavigator = () => {
             sceneContainerStyle={{ backgroundColor: backgroundColor }}
             tabBar={() => null}
           >
-            <Swipe.Screen
-              component={PairHardwareWalletAgainSheet}
-              name={Routes.PAIR_HARDWARE_WALLET_AGAIN_SHEET}
-            />
-            <Swipe.Screen
-              component={PairHardwareWalletErrorSheet}
-              name={Routes.PAIR_HARDWARE_WALLET_ERROR_SHEET}
-            />
+            <Swipe.Screen component={PairHardwareWalletAgainSheet} name={Routes.PAIR_HARDWARE_WALLET_AGAIN_SHEET} />
+            <Swipe.Screen component={PairHardwareWalletErrorSheet} name={Routes.PAIR_HARDWARE_WALLET_ERROR_SHEET} />
           </Swipe.Navigator>
         </SimpleSheet>
       )}

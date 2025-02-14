@@ -1,11 +1,4 @@
-export {
-  parseAccountAssets,
-  parseAssetName,
-  parseAssetSymbol,
-  parseAsset,
-  parseAssetNative,
-  parseAssetsNative,
-} from './accounts';
+export { parseAssetNative, parseAssetsNative } from './accounts';
 export {
   parseL2GasPrices,
   parseGasFeesBySpeed,
@@ -13,17 +6,12 @@ export {
   parseLegacyGasFeesBySpeed,
   gweiToWei,
   weiToGwei,
+  parseGasParamAmounts,
   parseGasParamsForTransaction,
   parseGasFeeParam,
   parseGasFees,
   defaultGasParamsFormat,
   parseRainbowMeteorologyData,
 } from './gas';
-export { parseNewTransaction } from './newTransaction';
 export { getRequestDisplayDetails } from './requests';
-export {
-  parseTransactions,
-  getTitle,
-  getDescription,
-  getTransactionLabel,
-} from './transactions';
+export { getDescription, convertNewTransactionToRainbowTransaction } from './transactions';

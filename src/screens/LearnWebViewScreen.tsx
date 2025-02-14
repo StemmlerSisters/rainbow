@@ -7,17 +7,14 @@ import { useTheme } from '@/theme';
 import ActivityIndicator from '@/components/ActivityIndicator';
 import Spinner from '@/components/Spinner';
 import { SlackSheet } from '@/components/sheet';
-import { Box, Text } from '@/design-system';
+import { Box, Text, useBackgroundColor } from '@/design-system';
 import { sharedCoolModalTopOffset } from '@/navigation/config';
 import { globalColors } from '@/design-system/color/palettes';
 import { ButtonPressAnimation } from '@/components/animations';
 import { IS_ANDROID } from '@/env';
 import { analyticsV2 } from '@/analytics';
 import * as i18n from '@/languages';
-import {
-  buildRainbowLearnUrl,
-  LearnUTMCampaign,
-} from '@/utils/buildRainbowUrl';
+import { buildRainbowLearnUrl, LearnUTMCampaign } from '@/utils/buildRainbowUrl';
 
 const HEADER_HEIGHT = 60;
 
@@ -80,20 +77,41 @@ export default function LearnWebViewScreen() {
     </Box>
   );
 
-  const contentHeight =
-    deviceHeight -
-    HEADER_HEIGHT -
-    (!isSmallPhone ? sharedCoolModalTopOffset : 0);
+  const contentHeight = deviceHeight - HEADER_HEIGHT - (!isSmallPhone ? sharedCoolModalTopOffset : 0);
 
   const LoadingSpinner = IS_ANDROID ? Spinner : ActivityIndicator;
 
-  const surfacePrimaryElevated = isDarkMode
-    ? globalColors.white10
-    : globalColors.white100;
+  const surfacePrimaryElevated = useBackgroundColor('surfacePrimaryElevated');
+
+  const injectedJavaScript = `
+    const style = document.createElement('style');
+    style.type = 'text/css';
+    style.innerHTML = \`
+      .super-navbar.simple, .notion-header__icon-wrapper, .intercom-lightweight-app { display: none; }
+      body { background-color: ${surfacePrimaryElevated}; }
+    \`;
+    
+    if (${isDarkMode}) {
+      style.innerHTML += \`
+        h1, h2, h3, h4, h5, p, li, .notion-callout__content { color: white; }
+        .bg-gray-light { background-color: ${globalColors.white30}; }
+        .notion-callout.bg-gray-light.border { border-color: ${globalColors.white30}; }
+      \`;
+    }
+  
+    document.head.appendChild(style);
+  
+    const updateHeight = () => {
+      window.ReactNativeWebView.postMessage(document.body.scrollHeight - 270);
+    };
+  
+    window.addEventListener('load', updateHeight);
+    window.addEventListener('resize', updateHeight);
+    
+    updateHeight();
+  `;
 
   return (
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore - JS component
     <SlackSheet
       renderHeader={renderHeader}
       backgroundColor={surfacePrimaryElevated}
@@ -105,6 +123,7 @@ export default function LearnWebViewScreen() {
     >
       <View pointerEvents="none">
         <WebView
+          injectedJavaScript={injectedJavaScript}
           startInLoadingState
           renderLoading={() => (
             <Box
@@ -121,18 +140,6 @@ export default function LearnWebViewScreen() {
             </Box>
           )}
           onMessage={event => setWebViewHeight(Number(event.nativeEvent.data))}
-          // set scrollview height
-          // set bg color
-          // remove header + icon
-          // remove leftover whitespace from removing header + icon
-          // @ts-ignore ts is yelling for some reason
-          injectedJavaScript={`
-            window.document.querySelector('body').style.backgroundColor = '${surfacePrimaryElevated}';
-            window.document.querySelector('body').style.marginTop = '-170px';
-            window.ReactNativeWebView.postMessage(document.body.scrollHeight);
-            document.getElementsByClassName('super-navbar simple')[0].style.display = 'none';
-            document.getElementsByClassName('notion-header__icon-wrapper')[0].style.display = 'none';
-         `}
           style={{
             height: webViewHeight,
           }}

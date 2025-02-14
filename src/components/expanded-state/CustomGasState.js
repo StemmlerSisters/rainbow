@@ -1,30 +1,23 @@
 import { useIsFocused, useRoute } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import { getSoftMenuBarHeight } from 'react-native-extra-dimensions-android';
-import Divider from '../Divider';
-import { ExchangeHeader } from '../exchange';
+import Divider from '@/components/Divider';
+import { ExchangeHeader } from '@/components/ExchangeHeader';
 import { FloatingPanel } from '../floating-panels';
-import { GasSpeedButton } from '../gas';
-import { Column } from '../layout';
-import { SlackSheet } from '../sheet';
-import { FeesPanel, FeesPanelTabs } from './custom-gas';
+import { GasSpeedButton } from '@/components/gas';
+import { Column } from '@/components/layout';
+import { SlackSheet } from '@/components/sheet';
 import { getTrendKey } from '@/helpers/gas';
-import {
-  useAccountSettings,
-  useColorForAsset,
-  useDimensions,
-  useGas,
-  useKeyboardHeight,
-} from '@/hooks';
+import { useColorForAsset, useDimensions, useGas, useKeyboardHeight } from '@/hooks';
 import { useNavigation } from '@/navigation';
 import styled from '@/styled-thing';
 import { margin } from '@/styles';
 import { deviceUtils } from '@/utils';
 import { IS_ANDROID } from '@/env';
-import { useSelector } from 'react-redux';
-import { getCrosschainSwapServiceTime } from '@/handlers/swap';
+import FeesPanel from '@/components/FeesPanel';
+import FeesPanelTabs from '@/components/FeesPanelTabs';
 
-const FOOTER_HEIGHT = 76;
+const FOOTER_HEIGHT = 120;
 const CONTENT_HEIGHT = 310;
 
 function useAndroidDisableGesturesOnFocus() {
@@ -40,36 +33,23 @@ const FeesPanelWrapper = styled(Column)(margin.object(19, 24, 29, 24));
 const FeesPanelTabswrapper = styled(Column)(margin.object(19, 0, 24, 0));
 
 export default function CustomGasState({ asset }) {
-  const { network } = useAccountSettings();
   const { setParams } = useNavigation();
-  const {
-    params: { longFormHeight, speeds, openCustomOptions } = {},
-  } = useRoute();
+  const { params: { longFormHeight, speeds, openCustomOptions, fallbackColor } = {} } = useRoute();
   const { colors } = useTheme();
   const { height: deviceHeight } = useDimensions();
   const keyboardHeight = useKeyboardHeight();
-  const colorForAsset = useColorForAsset(asset || {}, null, false, true);
-  const { selectedGasFee, currentBlockParams } = useGas();
+  const colorForAsset = useColorForAsset(asset || {}, fallbackColor, false, true);
+  const { selectedGasFee, currentBlockParams, chainId } = useGas();
   const [canGoBack, setCanGoBack] = useState(true);
-  const { tradeDetails } = useSelector(state => state.swap);
 
   const validateGasParams = useRef(null);
   useAndroidDisableGesturesOnFocus();
 
-  const sheetHeightWithoutKeyboard =
-    CONTENT_HEIGHT +
-    FOOTER_HEIGHT +
-    (IS_ANDROID ? 20 + getSoftMenuBarHeight() : 0);
+  const sheetHeightWithoutKeyboard = CONTENT_HEIGHT + FOOTER_HEIGHT + (IS_ANDROID ? 20 + getSoftMenuBarHeight() : 0);
 
-  const sheetHeightWithKeyboard =
-    sheetHeightWithoutKeyboard +
-    keyboardHeight +
-    (deviceUtils.isSmallPhone ? 30 : 0);
+  const sheetHeightWithKeyboard = sheetHeightWithoutKeyboard + keyboardHeight + (deviceUtils.isSmallPhone ? 30 : 0);
 
-  const currentGasTrend = useMemo(
-    () => getTrendKey(currentBlockParams?.trend),
-    [currentBlockParams?.trend]
-  );
+  const currentGasTrend = useMemo(() => getTrendKey(currentBlockParams?.trend), [currentBlockParams?.trend]);
 
   useEffect(() => {
     setParams({ longFormHeight: sheetHeightWithKeyboard });
@@ -111,13 +91,12 @@ export default function CustomGasState({ asset }) {
         <GasSpeedButton
           asset={asset}
           canGoBack={canGoBack}
-          currentNetwork={network}
+          chainId={chainId}
           showGasOptions
           testID="swap-details-gas"
           theme="dark"
           validateGasParams={validateGasParams}
           marginTop={19}
-          crossChainServiceTime={getCrosschainSwapServiceTime(tradeDetails)}
         />
       </Column>
     </SlackSheet>

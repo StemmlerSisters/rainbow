@@ -1,18 +1,15 @@
 import { maxBy, minBy } from 'lodash';
 
-export default function simplifyChartData(
-  data: any,
-  destinatedNumberOfPoints: number
-) {
+export default function simplifyChartData(data: any, destinatedNumberOfPoints: number) {
   if (!data) return null;
 
-  let allSegmentDividers: any = [];
+  const allSegmentDividers: any = [];
   let allSegmentsPoints: any = [];
-  let colors = [];
-  let lines = [];
-  let dividers = [];
-  let lastPoints = [];
-  let createdLastPoints: any = [];
+  const colors = [];
+  const lines = [];
+  const dividers = [];
+  const lastPoints = [];
+  const createdLastPoints: any = [];
 
   if (data.segments.length > 0) {
     for (let i = 0; i < 1; i++) {
@@ -28,15 +25,13 @@ export default function simplifyChartData(
     }
   }
   if (allSegmentsPoints.length > destinatedNumberOfPoints) {
-    let destMul = allSegmentsPoints.length / destinatedNumberOfPoints;
+    const destMul = allSegmentsPoints.length / destinatedNumberOfPoints;
     const maxValue = maxBy(allSegmentsPoints, 'y');
     const minValue = minBy(allSegmentsPoints, 'y');
 
-    const dataDiff =
-      allSegmentsPoints[allSegmentsPoints.length - 1].x -
-      allSegmentsPoints[0].x;
+    const dataDiff = allSegmentsPoints[allSegmentsPoints.length - 1].x - allSegmentsPoints[0].x;
     const xMul = Math.floor(dataDiff / allSegmentsPoints.length);
-    let newData = [];
+    const newData = [];
     newData.push({
       isImportant: true,
       x: allSegmentsPoints[0].x - xMul * 2,
@@ -64,10 +59,7 @@ export default function simplifyChartData(
         createdLastPoints.push(newData.length);
       }
       newData.push({
-        isImportant:
-          (allSegmentsPoints[f].isImportant ||
-            allSegmentsPoints[f + 1].isImportant) &&
-          !newData[newData.length - 1].isImportant,
+        isImportant: (allSegmentsPoints[f].isImportant || allSegmentsPoints[f + 1].isImportant) && !newData[newData.length - 1].isImportant,
         x: allSegmentsPoints[0].x + i * xMul,
         y: finalValue,
       });

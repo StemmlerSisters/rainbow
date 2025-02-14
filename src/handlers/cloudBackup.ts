@@ -1,13 +1,15 @@
 import { sortBy } from 'lodash';
 // @ts-expect-error ts-migrate(7016) FIXME: Could not find a declaration file for module 'reac... Remove this comment to see the full error message
 import RNCloudFs from 'react-native-cloud-fs';
-import { RAINBOW_MASTER_KEY } from 'react-native-dotenv';
 import RNFS from 'react-native-fs';
 import AesEncryptor from '../handlers/aesEncryption';
 import { logger, RainbowError } from '@/logger';
 import { IS_ANDROID, IS_IOS } from '@/env';
+import { BackupFile, CloudBackups } from '@/model/backup';
+
 const REMOTE_BACKUP_WALLET_DIR = 'rainbow.me/wallet-backups';
-const USERDATA_FILE = 'UserData.json';
+export const USERDATA_FILE = 'UserData.json';
+
 const encryptor = new AesEncryptor();
 
 export const CLOUD_BACKUP_ERRORS = {
@@ -27,7 +29,7 @@ export function normalizeAndroidBackupFilename(filename: string) {
   return filename.replace(`${REMOTE_BACKUP_WALLET_DIR}/`, '');
 }
 
-export function logoutFromGoogleDrive() {
+export async function logoutFromGoogleDrive() {
   IS_ANDROID && RNCloudFs.logout();
 }
 
@@ -37,13 +39,12 @@ export type GoogleDriveUserData = {
   avatarUrl?: string;
 };
 
-export async function getGoogleAccountUserData(): Promise<
-  GoogleDriveUserData | undefined
-> {
+export async function getGoogleAccountUserData(checkPermissions = false): Promise<GoogleDriveUserData | undefined> {
   if (!IS_ANDROID) {
     return;
   }
-  return RNCloudFs.getCurrentlySignedInUserData();
+  const options = { checkPermissions };
+  return RNCloudFs.getCurrentlySignedInUserData(options);
 }
 
 // This is used for dev purposes only!
@@ -62,36 +63,32 @@ export async function deleteAllBackups() {
   );
 }
 
-export async function fetchAllBackups() {
+export async function fetchAllBackups(): Promise<CloudBackups> {
   if (android) {
     await RNCloudFs.loginIfNeeded();
   }
-  return RNCloudFs.listFiles({
+
+  const files = await RNCloudFs.listFiles({
     scope: 'hidden',
     targetPath: REMOTE_BACKUP_WALLET_DIR,
   });
+
+  return {
+    files: files?.files?.filter((file: BackupFile) => normalizeAndroidBackupFilename(file.name) !== USERDATA_FILE) || [],
+  };
 }
 
-export async function encryptAndSaveDataToCloud(
-  data: any,
-  password: any,
-  filename: any
-) {
+export async function encryptAndSaveDataToCloud(data: Record<string, unknown>, password: string, filename: string) {
   // Encrypt the data
   try {
-    const encryptedData = await encryptor.encrypt(
-      password,
-      JSON.stringify(data)
-    );
+    const encryptedData = await encryptor.encrypt(password, JSON.stringify(data));
 
     /**
      * We need to normalize the filename on Android, because sometimes
      * the filename is returned with the path used for Google Drive storage.
      * That is with REMOTE_BACKUP_WALLET_DIR included.
      */
-    const backupFilename = IS_ANDROID
-      ? normalizeAndroidBackupFilename(filename)
-      : filename;
+    const backupFilename = IS_ANDROID ? normalizeAndroidBackupFilename(filename) : filename;
 
     // Store it on the FS first
     const path = `${RNFS.DocumentDirectoryPath}/${backupFilename}`;
@@ -110,6 +107,7 @@ export async function encryptAndSaveDataToCloud(
       scope,
       sourcePath: sourceUri,
       targetPath: destinationPath,
+      update: true,
     });
     // Now we need to verify the file has been stored in the cloud
     const exists = await RNCloudFs.fileExists(
@@ -125,16 +123,14 @@ export async function encryptAndSaveDataToCloud(
     );
 
     if (!exists) {
-      logger.info('Backup doesnt exist after completion');
       const error = new Error(CLOUD_BACKUP_ERRORS.INTEGRITY_CHECK_FAILED);
-      logger.error(new RainbowError(error.message));
       throw error;
     }
 
     await RNFS.unlink(path);
     return filename;
   } catch (e: any) {
-    logger.error(new RainbowError('Error during encryptAndSaveDataToCloud'), {
+    logger.error(new RainbowError('[cloudBackup]: Error during encryptAndSaveDataToCloud'), {
       message: e.message,
     });
     throw new Error(CLOUD_BACKUP_ERRORS.GENERAL_ERROR);
@@ -156,7 +152,7 @@ export function syncCloud() {
   return true;
 }
 
-export async function getDataFromCloud(backupPassword: any, filename = null) {
+export async function getDataFromCloud(backupPassword: any, filename: string | null = null) {
   if (IS_ANDROID) {
     await RNCloudFs.loginIfNeeded();
   }
@@ -175,21 +171,15 @@ export async function getDataFromCloud(backupPassword: any, filename = null) {
   if (filename) {
     if (IS_IOS) {
       // .icloud are files that were not yet synced
-      document = backups.files.find(
-        (file: any) =>
-          file.name === filename || file.name === `.${filename}.icloud`
-      );
+      document = backups.files.find((file: any) => file.name === filename || file.name === `.${filename}.icloud`);
     } else {
       document = backups.files.find((file: any) => {
-        return (
-          file.name === `${REMOTE_BACKUP_WALLET_DIR}/${filename}` ||
-          file.name === filename
-        );
+        return file.name === `${REMOTE_BACKUP_WALLET_DIR}/${filename}` || file.name === filename;
       });
     }
 
     if (!document) {
-      logger.error(new RainbowError('No backup found with that name!'), {
+      logger.error(new RainbowError('[cloudBackup]: No backup found with that name!'), {
         filename,
       });
       const error = new Error(CLOUD_BACKUP_ERRORS.SPECIFIC_BACKUP_NOT_FOUND);
@@ -199,57 +189,43 @@ export async function getDataFromCloud(backupPassword: any, filename = null) {
     const sortedBackups = sortBy(backups.files, 'lastModified').reverse();
     document = sortedBackups[0];
   }
-  const encryptedData = ios
-    ? await getICloudDocument(filename)
-    : await getGoogleDriveDocument(document.id);
+  const encryptedData = ios ? await getICloudDocument(filename) : await getGoogleDriveDocument(document.id);
 
   if (encryptedData) {
-    logger.info('Got cloud document ', { filename });
-    const backedUpDataStringified = await encryptor.decrypt(
-      backupPassword,
-      encryptedData
-    );
+    logger.debug(`[cloudBackup]: Got cloud document ${filename}`);
+    const backedUpDataStringified = await encryptor.decrypt(backupPassword, encryptedData);
     if (backedUpDataStringified) {
       const backedUpData = JSON.parse(backedUpDataStringified);
       return backedUpData;
     } else {
-      logger.error(new RainbowError('We couldnt decrypt the data'));
+      logger.error(new RainbowError('[cloudBackup]: We couldnt decrypt the data'));
       const error = new Error(CLOUD_BACKUP_ERRORS.ERROR_DECRYPTING_DATA);
       throw error;
     }
   }
 
-  logger.error(new RainbowError('We couldnt get the encrypted data'));
+  logger.error(new RainbowError('[cloudBackup]: We couldnt get the encrypted data'));
   const error = new Error(CLOUD_BACKUP_ERRORS.ERROR_GETTING_ENCRYPTED_DATA);
   throw error;
-}
-
-export async function backupUserDataIntoCloud(data: any) {
-  const filename = USERDATA_FILE;
-  const password = RAINBOW_MASTER_KEY;
-  return encryptAndSaveDataToCloud(data, password, filename);
-}
-
-export async function fetchUserDataFromCloud() {
-  const filename = USERDATA_FILE;
-  const password = RAINBOW_MASTER_KEY;
-  // @ts-expect-error ts-migrate(2345) FIXME: Argument of type '"UserData.json"' is not assignab... Remove this comment to see the full error message
-  return getDataFromCloud(password, filename);
 }
 
 export const cloudBackupPasswordMinLength = 8;
 
 export function isCloudBackupPasswordValid(password: any) {
-  return !!(
-    password &&
-    password !== '' &&
-    password.length >= cloudBackupPasswordMinLength
-  );
+  return !!(password && password !== '' && password.length >= cloudBackupPasswordMinLength);
 }
 
 export function isCloudBackupAvailable() {
   if (ios) {
     return RNCloudFs.isAvailable();
   }
+  return true;
+}
+
+export async function login() {
+  if (IS_ANDROID) {
+    return RNCloudFs.loginIfNeeded();
+  }
+
   return true;
 }

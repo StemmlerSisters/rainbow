@@ -1,7 +1,6 @@
 import MaskedView from '@react-native-masked-view/masked-view';
 import React from 'react';
 import { View, ViewProps } from 'react-native';
-import { IS_TESTING } from 'react-native-dotenv';
 import { ThemeContextProps, withThemeContext } from '../../theme/ThemeContext';
 import { deviceUtils } from '../../utils';
 import { ShimmerAnimation } from '../animations';
@@ -9,6 +8,7 @@ import { CoinRowHeight } from '../coin-row';
 import { Row } from '../layout';
 import styled from '@/styled-thing';
 import { position } from '@/styles';
+import { IS_TEST } from '@/env';
 
 export const AssetListItemSkeletonHeight = CoinRowHeight;
 
@@ -20,9 +20,15 @@ type FakeItemProps = {
 // @ts-expect-error Property 'View' does not exist on type...
 export const FakeAvatar = styled.View({
   ...position.sizeAsObject(40),
-  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) =>
-    color ?? colors.skeleton,
+  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) => color ?? colors.skeleton,
   borderRadius: 20,
+});
+
+// @ts-expect-error Property 'View' does not exist on type...
+export const FakeNFT = styled.View({
+  ...position.sizeAsObject(32),
+  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) => color ?? colors.skeleton,
+  borderRadius: 16,
 });
 
 export const FakeRow = styled(Row).attrs({
@@ -34,14 +40,11 @@ export const FakeRow = styled(Row).attrs({
   paddingTop: 5,
 })({});
 
-export const FakeText = styled(View).attrs(
-  ({ height = 10, width }: { height: number; width: number }) => ({
-    height,
-    width,
-  })
-)({
-  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) =>
-    color ?? colors.skeleton,
+export const FakeText = styled(View).attrs(({ height = 10, width }: { height: number; width: number }) => ({
+  height,
+  width,
+}))({
+  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) => color ?? colors.skeleton,
   borderRadius: ({ height }: { height: number }) => height / 2,
   height: ({ height }: { height: number }) => height,
   width: ({ width }: { width: number }) => width,
@@ -52,8 +55,7 @@ const Wrapper = styled(View)({
 });
 
 const ShimmerWrapper = styled(Wrapper)({
-  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) =>
-    color ?? colors.skeleton,
+  backgroundColor: ({ theme: { colors }, color }: FakeItemProps) => color ?? colors.skeleton,
 });
 
 function Skeleton({
@@ -73,20 +75,11 @@ function Skeleton({
   skeletonColor?: string;
   width?: number;
 }) {
-  if (animated && IS_TESTING !== 'true') {
+  if (animated && !IS_TEST) {
     return (
-      <MaskedView
-        maskElement={<Wrapper style={style}>{children}</Wrapper>}
-        style={{ flex: 1 }}
-      >
+      <MaskedView maskElement={<Wrapper style={style}>{children}</Wrapper>} style={{ flex: 1 }}>
         <ShimmerWrapper color={skeletonColor}>
-          <ShimmerAnimation
-            color={shimmerColor ?? colors.shimmer}
-            enabled
-            // @ts-expect-error JS Component
-            gradientColor={shimmerColor ?? colors.shimmer}
-            width={width}
-          />
+          <ShimmerAnimation color={shimmerColor ?? colors.shimmer} enabled gradientColor={shimmerColor ?? colors.shimmer} width={width} />
         </ShimmerWrapper>
       </MaskedView>
     );

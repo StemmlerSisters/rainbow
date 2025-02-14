@@ -1,12 +1,6 @@
-import React, { Fragment, PropsWithChildren, useLayoutEffect } from 'react';
+import React, { Fragment, PropsWithChildren, memo, useLayoutEffect } from 'react';
 import { Insets, ViewProps } from 'react-native';
-import Animated, {
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  WithSpringConfig,
-} from 'react-native-reanimated';
+import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, WithSpringConfig } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeContextProps, useTheme } from '../../theme/ThemeContext';
 import { Icon } from '../icons';
@@ -42,7 +36,7 @@ const Container = styled(RowWithMargins).attrs({
   ...position.centeredAsObject,
   backgroundColor: color,
   borderRadius: 20,
-  bottom: (insets.bottom || 40) + 3,
+  bottom: (insets.bottom || 40) + 60,
   maxWidth: deviceWidth - 38,
   position: 'absolute',
   zIndex: 100,
@@ -59,17 +53,7 @@ type Props = PropsWithChildren<{
 }> &
   Pick<ViewProps, 'testID'>;
 
-export default function Toast({
-  children,
-  color,
-  distance = 60,
-  targetTranslate = 0,
-  icon,
-  isVisible,
-  testID,
-  text,
-  textColor,
-}: Props) {
+function Toast({ children, color, distance = 90, targetTranslate = 0, icon, isVisible, testID, text, textColor }: Props) {
   const { colors, isDarkMode } = useTheme();
   const { width: deviceWidth } = useDimensions();
   const insets = useSafeAreaInsets();
@@ -80,12 +64,7 @@ export default function Toast({
   }, [isVisible, animation]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const translateY = interpolate(
-      animation.value,
-      [0, 1],
-      [distance, targetTranslate],
-      'extend'
-    );
+    const translateY = interpolate(animation.value, [0, 1], [distance, targetTranslate], 'extend');
 
     return {
       opacity: animation.value,
@@ -96,27 +75,12 @@ export default function Toast({
   const currentColor = color ?? isDarkMode ? colors.darkModeDark : colors.dark;
 
   return (
-    <Animated.View style={animatedStyle}>
-      <Container
-        color={currentColor}
-        deviceWidth={deviceWidth}
-        insets={insets}
-        testID={testID}
-      >
+    <Animated.View pointerEvents="none" style={animatedStyle}>
+      <Container color={currentColor} deviceWidth={deviceWidth} insets={insets} testID={testID}>
         {children ?? (
           <Fragment>
-            {icon && (
-              <Icon
-                color={textColor ?? colors.whiteLabel}
-                marginTop={3}
-                name={icon}
-              />
-            )}
-            <TruncatedText
-              color={textColor ?? colors.whiteLabel}
-              size="smedium"
-              weight="bold"
-            >
+            {icon && <Icon color={textColor ?? colors.whiteLabel} marginTop={3} name={icon} />}
+            <TruncatedText color={textColor ?? colors.whiteLabel} size="smedium" weight="bold">
               {text}
             </TruncatedText>
           </Fragment>
@@ -125,3 +89,5 @@ export default function Toast({
     </Animated.View>
   );
 }
+
+export default memo(Toast);

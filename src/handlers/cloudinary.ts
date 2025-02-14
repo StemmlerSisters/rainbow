@@ -13,7 +13,7 @@ type CloudinaryConfig = {
 const PixelRatios = [1, 1.5, 2, 2.625, 2.75, 3, 3.5]; // popular ratios.
 const IconsSizes = [40, 36]; // Remove 36 with TopMover
 const allowedIconSizes = PixelRatios.reduce((acc, ratio) => {
-  for (let size of IconsSizes) {
+  for (const size of IconsSizes) {
     acc.push(size * ratio);
   }
   return acc;
@@ -37,9 +37,7 @@ export const signCloudinaryIconUrl = memoFn(
 
     const directory = internalAddress.split('/')[0];
 
-    const usedWidth = supportedSizeTransformations[directory]
-      ? pickScale(supportedSizeTransformations[directory], width)
-      : width;
+    const usedWidth = supportedSizeTransformations[directory] ? pickScale(supportedSizeTransformations[directory], width) : width;
 
     const cloudinaryImg = cloudinaryURL(internalAddress, {
       height: usedWidth,
@@ -52,8 +50,7 @@ export const signCloudinaryIconUrl = memoFn(
     }
     return cloudinaryImg;
   },
-  (url, options) =>
-    `${url}-${options.width}-${options.height}-${options.format}`
+  (url, options) => `${url}-${options.width}-${options.height}-${options.format}`
 );
 
 export function isCloudinaryStorageIconLink(url: string): boolean {

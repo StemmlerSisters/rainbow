@@ -1,15 +1,4 @@
-import { Network } from '@/helpers';
-
-export enum SimpleHashChain {
-  Arbitrum = 'arbitrum',
-  Bsc = 'bsc',
-  Ethereum = 'ethereum',
-  Gnosis = 'gnosis',
-  Optimism = 'optimism',
-  Polygon = 'polygon',
-  Zora = 'zora',
-  Base = 'base',
-}
+import { Network } from '@/state/backendNetworks/types';
 
 /**
  * @see https://docs.simplehash.com/reference/sale-model
@@ -98,7 +87,7 @@ type SimpleHashCollection = {
  */
 export type SimpleHashNFT = {
   nft_id: string;
-  chain: SimpleHashChain;
+  chain: string;
   contract_address: string;
   token_id: string | null;
   name: string | null;
@@ -189,10 +178,7 @@ export type SimpleHashNFT = {
   };
 };
 
-export type ValidatedSimpleHashNFT = Omit<
-  SimpleHashNFT,
-  'name' | 'chain' | 'collection' | 'contract_address' | 'token_id'
-> & {
+export type ValidatedSimpleHashNFT = Omit<SimpleHashNFT, 'name' | 'chain' | 'collection' | 'contract_address' | 'token_id'> & {
   name: string;
   chain: Network;
   collection: Omit<SimpleHashCollection, 'name'> & { name: string };

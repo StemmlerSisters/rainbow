@@ -9,16 +9,10 @@ export const setInitialSettings = (): void => {
   StatusBar.setTranslucent(true);
   StatusBar.setBarStyle('dark-content', true);
 };
-export const setBackgroundColor = (
-  color: ColorValue,
-  animated?: boolean
-): void => {
+export const setBackgroundColor = (color: ColorValue, animated?: boolean): void => {
   StatusBar.setBackgroundColor(color, animated);
 };
-export const setHidden = (
-  hidden: boolean,
-  animation?: StatusBarAnimation
-): void => {
+export const setHidden = (hidden: boolean, animation?: StatusBarAnimation): void => {
   StatusBar.setHidden(hidden, animation);
 };
 

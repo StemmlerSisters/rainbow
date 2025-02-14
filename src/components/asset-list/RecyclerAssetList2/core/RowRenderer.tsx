@@ -1,27 +1,21 @@
 import React from 'react';
 import { CoinDivider } from '../../../coin-divider';
-import { AssetListHeader, AssetListItemSkeleton } from '../../index';
+import { AssetListItemSkeleton } from '../../index';
 import FastBalanceCoinRow from '../FastComponents/FastBalanceCoinRow';
 import WrappedNFT from '../WrappedNFT';
-import WrappedPoolRow from '../WrappedPoolRow';
-import WrappedPoolsListHeader from '../WrappedPoolsListHeader';
-import WrappedSavingsListHeader from '../WrappedSavingsListHeader';
-import WrappedSavingsRow from '../WrappedSavingsRow';
 import WrappedTokenFamilyHeader from '../WrappedTokenFamilyHeader';
 import { ExtendedState } from './RawRecyclerList';
 import {
   AssetsHeaderExtraData,
   CellType,
+  ClaimableExtraData,
+  ClaimablesHeaderExtraData,
   CoinDividerExtraData,
   CoinExtraData,
   NFTExtraData,
   NFTFamilyExtraData,
-  PoolsHeaderExtraData,
   PositionExtraData,
   PositionHeaderExtraData,
-  SavingExtraData,
-  SavingsHeaderExtraData,
-  UniswapPoolExtraData,
 } from './ViewTypes';
 import assertNever from '@/helpers/assertNever';
 import { ProfileRowWrapper } from '../profile-header/ProfileRowWrapper';
@@ -37,13 +31,14 @@ import { DiscoverMoreButton } from './DiscoverMoreButton';
 import { RotatingLearnCard } from '@/components/cards/RotatingLearnCard';
 import WrappedPosition from '../WrappedPosition';
 import WrappedPositionsListHeader from '../WrappedPositionsListHeader';
+import { RemoteCardCarousel } from '@/components/cards/remote-cards';
+import WrappedCollectiblesHeader from '../WrappedCollectiblesHeader';
+import NFTLoadingSkeleton from '../NFTLoadingSkeleton';
+import { NFTEmptyState } from '../NFTEmptyState';
+import { ClaimablesListHeader } from '../ClaimablesListHeader';
+import { Claimable } from '../Claimable';
 
-function rowRenderer(
-  type: CellType,
-  { uid }: { uid: string },
-  _: unknown,
-  extendedState: ExtendedState
-) {
+function rowRenderer(type: CellType, { uid }: { uid: string }, _: unknown, extendedState: ExtendedState) {
   const data = extendedState.additionalData[uid];
   switch (type) {
     case CellType.ASSETS_HEADER_SPACE_AFTER:
@@ -55,20 +50,19 @@ function rowRenderer(
     case CellType.PROFILE_AVATAR_ROW_SPACE_BEFORE:
     case CellType.PROFILE_BALANCE_ROW_SPACE_AFTER:
     case CellType.PROFILE_NAME_ROW_SPACE_AFTER:
-    case CellType.SAVINGS_HEADER_SPACE_BEFORE:
     case CellType.EMPTY_WALLET_SPACER:
     case CellType.BIG_EMPTY_WALLET_SPACER:
     case CellType.EMPTY_ROW:
     case CellType.POSITIONS_SPACE_AFTER:
     case CellType.POSITIONS_SPACE_BEFORE:
+    case CellType.CLAIMABLES_SPACE_AFTER:
+    case CellType.CLAIMABLES_SPACE_BEFORE:
       return null;
     case CellType.COIN_DIVIDER:
       return (
         <CoinDivider
           balancesSum={(data as CoinDividerExtraData).value}
-          defaultToEditButton={
-            (data as CoinDividerExtraData).defaultToEditButton
-          }
+          defaultToEditButton={(data as CoinDividerExtraData).defaultToEditButton}
           extendedState={extendedState}
         />
       );
@@ -99,26 +93,14 @@ function rowRenderer(
       );
     case CellType.PROFILE_STICKY_HEADER:
       return <ProfileStickyHeader />;
+    case CellType.REMOTE_CARD_CAROUSEL:
+      return (
+        <CardRowWrapper>
+          <RemoteCardCarousel />
+        </CardRowWrapper>
+      );
     case CellType.COIN:
-      return (
-        <FastBalanceCoinRow
-          extendedState={extendedState}
-          uniqueId={(data as CoinExtraData).uniqueId}
-        />
-      );
-    case CellType.SAVINGS_HEADER:
-      return (
-        <WrappedSavingsListHeader
-          // @ts-ignore
-          value={(data as SavingsHeaderExtraData).value}
-        />
-      );
-    case CellType.SAVINGS:
-      return <WrappedSavingsRow address={(data as SavingExtraData).address} />;
-    case CellType.POOLS_HEADER:
-      return (
-        <WrappedPoolsListHeader value={(data as PoolsHeaderExtraData).value} />
-      );
+      return <FastBalanceCoinRow extendedState={extendedState} uniqueId={(data as CoinExtraData).uniqueId} />;
     case CellType.PROFILE_ACTION_BUTTONS_ROW:
       return (
         <ProfileRowWrapper>
@@ -136,6 +118,7 @@ function rowRenderer(
         <ProfileRowWrapper>
           <ProfileBalanceRow
             totalValue={(data as AssetsHeaderExtraData).value}
+            isLoadingBalance={(data as AssetsHeaderExtraData).isLoadingBalance}
           />
         </ProfileRowWrapper>
       );
@@ -145,17 +128,15 @@ function rowRenderer(
           <ProfileNameRow testIDPrefix="profile-name" />
         </ProfileRowWrapper>
       );
-    case CellType.UNISWAP_POOL:
-      return (
-        <WrappedPoolRow address={(data as UniswapPoolExtraData).address} />
-      );
     case CellType.NFTS_HEADER:
-      return (
-        // @ts-expect-error JavaScript component
-        <AssetListHeader title="Collectibles" />
-      );
+      return <WrappedCollectiblesHeader />;
+    case CellType.NFTS_LOADING:
+      return <NFTLoadingSkeleton />;
+    case CellType.NFTS_EMPTY:
+      return <NFTEmptyState />;
     case CellType.FAMILY_HEADER: {
       const { name, image, total } = data as NFTFamilyExtraData;
+
       return (
         <WrappedTokenFamilyHeader
           image={image}
@@ -185,12 +166,16 @@ function rowRenderer(
     case CellType.POSITION: {
       const { uniqueId, index } = data as PositionExtraData;
 
-      return (
-        <WrappedPosition
-          placement={index % 2 === 0 ? 'left' : 'right'}
-          uniqueId={uniqueId}
-        />
-      );
+      return <WrappedPosition placement={index % 2 === 0 ? 'left' : 'right'} uniqueId={uniqueId} />;
+    }
+    case CellType.CLAIMABLES_HEADER: {
+      const { total } = data as ClaimablesHeaderExtraData;
+      return <ClaimablesListHeader total={total} />;
+    }
+    case CellType.CLAIMABLE: {
+      const { uniqueId } = data as ClaimableExtraData;
+
+      return <Claimable uniqueId={uniqueId} extendedState={extendedState} />;
     }
 
     case CellType.LOADING_ASSETS:
@@ -200,7 +185,4 @@ function rowRenderer(
   }
 }
 
-export default rowRenderer as (
-  type: string | number,
-  data: any
-) => React.ReactElement;
+export default rowRenderer as (type: string | number, data: any) => React.ReactElement;

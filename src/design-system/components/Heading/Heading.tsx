@@ -1,13 +1,10 @@
-import React, { ElementRef, forwardRef, ReactNode, useMemo } from 'react';
+import React, { ElementRef, forwardRef, ReactNode, useEffect, useMemo } from 'react';
 import { Text as NativeText } from 'react-native';
-
+import { SILENCE_EMOJI_WARNINGS } from 'react-native-dotenv';
+import { IS_DEV, IS_IOS } from '@/env';
 import { CustomColor } from '../../color/useForegroundColor';
 import { createLineHeightFixNode } from '../../typography/createLineHeightFixNode';
-import {
-  nodeHasEmoji,
-  nodeIsString,
-  renderStringWithEmoji,
-} from '../../typography/renderStringWithEmoji';
+import { nodeHasEmoji, nodeIsString, renderStringWithEmoji } from '../../typography/renderStringWithEmoji';
 import { headingSizes, headingWeights } from '../../typography/typography';
 import { TextColor } from '../../color/palettes';
 import { useHeadingStyle } from './useHeadingStyle';
@@ -28,21 +25,12 @@ export type HeadingProps = {
 );
 
 /** @deprecated Use `Text` instead */
-export const Heading = forwardRef<ElementRef<typeof NativeText>, HeadingProps>(
-  function Heading(
-    {
-      align,
-      color,
-      numberOfLines,
-      containsEmoji: containsEmojiProp = false,
-      children,
-      testID,
-      size,
-      weight,
-    },
-    ref
-  ) {
-    if (__DEV__) {
+export const Heading = forwardRef<ElementRef<typeof NativeText>, HeadingProps>(function Heading(
+  { align, color, numberOfLines, containsEmoji: containsEmojiProp = false, children, testID, size, weight },
+  ref
+) {
+  useEffect(() => {
+    if (IS_DEV && !SILENCE_EMOJI_WARNINGS) {
       if (!containsEmojiProp && nodeHasEmoji(children)) {
         // eslint-disable-next-line no-console
         console.log(
@@ -55,27 +43,17 @@ export const Heading = forwardRef<ElementRef<typeof NativeText>, HeadingProps>(
         );
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    const headingStyle = useHeadingStyle({ align, color, size, weight });
+  const headingStyle = useHeadingStyle({ align, color, size, weight });
 
-    const lineHeightFixNode = useMemo(
-      () => createLineHeightFixNode(headingStyle.lineHeight),
-      [headingStyle]
-    );
+  const lineHeightFixNode = useMemo(() => createLineHeightFixNode(headingStyle.lineHeight), [headingStyle]);
 
-    return (
-      <NativeText
-        allowFontScaling={false}
-        numberOfLines={numberOfLines}
-        ref={ref}
-        style={headingStyle}
-        testID={testID}
-      >
-        {ios && containsEmojiProp && nodeIsString(children)
-          ? renderStringWithEmoji(children)
-          : children}
-        {lineHeightFixNode}
-      </NativeText>
-    );
-  }
-);
+  return (
+    <NativeText allowFontScaling={false} numberOfLines={numberOfLines} ref={ref} style={headingStyle} testID={testID}>
+      {IS_IOS && containsEmojiProp && nodeIsString(children) ? renderStringWithEmoji(children) : children}
+      {lineHeightFixNode}
+    </NativeText>
+  );
+});

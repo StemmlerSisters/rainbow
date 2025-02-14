@@ -1,4 +1,4 @@
-/*global storage*/
+/* global storage*/
 import { legacy } from '@/storage/legacy';
 import { logger, RainbowError } from '@/logger';
 
@@ -17,7 +17,7 @@ export const saveLocal = (key = '', data = {}) => {
   try {
     legacy.set([key], data);
   } catch (error) {
-    logger.error(new RainbowError('Legacy Storage: saveLocal error'));
+    logger.error(new RainbowError('[localstorage/common]: saveLocal error'));
   }
 };
 
@@ -40,11 +40,7 @@ export const getLocal = async (key = '') => {
  *
  * @deprecated use @/storage/legacy
  */
-export const deprecatedSaveLocal = async (
-  key = '',
-  data = {},
-  version = defaultVersion
-) => {
+export const deprecatedSaveLocal = async (key = '', data = {}, version = defaultVersion) => {
   try {
     // @ts-expect-error ts-migrate(2339) FIXME: Property 'storageVersion' does not exist on type '... Remove this comment to see the full error message
     data.storageVersion = version;
@@ -55,7 +51,7 @@ export const deprecatedSaveLocal = async (
       key,
     });
   } catch (error) {
-    logger.error(new RainbowError('Storage: deprecatedSaveLocal error'));
+    logger.error(new RainbowError('[localstorage/common]: deprecatedSaveLocal error'));
   }
 };
 
@@ -66,10 +62,7 @@ export const deprecatedSaveLocal = async (
  *
  * @deprecated use @/storage/legacy
  */
-export const deprecatedGetLocal = async (
-  key = '',
-  version = defaultVersion
-) => {
+export const deprecatedGetLocal = async (key = '', version = defaultVersion) => {
   try {
     // @ts-expect-error ts-migrate(2552) FIXME: Cannot find name 'storage'. Did you mean 'Storage'... Remove this comment to see the full error message
     const result = await storage.load({
@@ -97,7 +90,7 @@ export const deprecatedGetLocal = async (
       case 'ExpiredError':
         break;
       default:
-        logger.error(new RainbowError('Storage: deprecatedGetLocal error'));
+        logger.error(new RainbowError('[localstorage/common]: deprecatedGetLocal error'));
     }
 
     return null;
@@ -116,49 +109,28 @@ export const deprecatedRemoveLocal = (key = '') => {
     // @ts-expect-error ts-migrate(2552) FIXME: Cannot find name 'storage'. Did you mean 'Storage'... Remove this comment to see the full error message
     storage.remove({ key });
   } catch (error) {
-    logger.error(new RainbowError('Storage: deprecatedRemoveLocal error'));
+    logger.error(new RainbowError('[localstorage/common]: deprecatedRemoveLocal error'));
   }
 };
 
-export const getGlobal = async (
-  key: any,
-  emptyState: any,
-  version = defaultVersion
-) => {
+export const getGlobal = async (key: any, emptyState: any, version = defaultVersion) => {
   const result = await getLocal(key);
   return result ? result.data : emptyState;
 };
 
-export const saveGlobal = (key: any, data: any, version = defaultVersion) =>
-  saveLocal(key, { data });
+export const saveGlobal = (key: any, data: any, version = defaultVersion) => saveLocal(key, { data });
 
-export const getAccountLocal = async (
-  prefix: any,
-  accountAddress: any,
-  network: any,
-  emptyState = [],
-  version = defaultVersion
-) => {
+export const getAccountLocal = async (prefix: any, accountAddress: any, network: any, emptyState = [], version = defaultVersion) => {
   const key = getKey(prefix, accountAddress, network);
   const result = await getLocal(key);
   return result ? result.data : emptyState;
 };
 
-export function saveAccountLocal(
-  prefix: any,
-  data: any,
-  accountAddress: any,
-  network: any,
-  version = defaultVersion
-) {
+export function saveAccountLocal(prefix: any, data: any, accountAddress: any, network: any, version = defaultVersion) {
   return saveLocal(getKey(prefix, accountAddress, network), { data });
 }
 
-export const removeAccountLocal = (
-  prefix: any,
-  accountAddress: any,
-  network: any
-) => {
+export const removeAccountLocal = (prefix: any, accountAddress: any, network: any) => {
   const key = getKey(prefix, accountAddress, network);
   deprecatedRemoveLocal(key);
 };

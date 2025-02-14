@@ -8,38 +8,30 @@ import { parseUri } from '@walletconnect/utils';
 import { Alert } from '../components/alerts';
 import useExperimentalFlag, { PROFILES } from '../config/experimentalHooks';
 import { useNavigation } from '../navigation/Navigation';
-import useWalletConnectConnections from './useWalletConnectConnections';
 import { fetchReverseRecordWithRetry } from '@/utils/profileUtils';
 import { analytics } from '@/analytics';
-import {
-  checkIsValidAddressOrDomain,
-  isENSAddressFormat,
-} from '@/helpers/validators';
+import { checkIsValidAddressOrDomain, isENSAddressFormat } from '@/helpers/validators';
 import { Navigation } from '@/navigation';
 import { POAP_BASE_URL, RAINBOW_PROFILES_BASE_URL } from '@/references';
 import Routes from '@/navigation/routesNames';
 import { addressUtils, ethereumUtils, haptics } from '@/utils';
-import logger from '@/utils/logger';
+import { logger, RainbowError } from '@/logger';
 import { checkPushNotificationPermissions } from '@/notifications/permissions';
 import { pair as pairWalletConnect } from '@/walletConnect';
-import {
-  getPoapAndOpenSheetWithQRHash,
-  getPoapAndOpenSheetWithSecretWord,
-} from '@/utils/poaps';
+import { getPoapAndOpenSheetWithQRHash, getPoapAndOpenSheetWithSecretWord } from '@/utils/poaps';
 
 export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
   const { navigate, goBack } = useNavigation();
-  const { walletConnectOnSessionRequest } = useWalletConnectConnections();
   const profilesEnabled = useExperimentalFlag(PROFILES);
   const enabledVar = useRef<boolean>();
 
   const enableScanning = useCallback(() => {
-    logger.log('📠✅ Enabling QR Code Scanner');
+    logger.debug('[useScanner]: 📠✅  Enabling QR Code Scanner');
     enabledVar.current = true;
   }, [enabledVar]);
 
   const disableScanning = useCallback(() => {
-    logger.log('📠🚫 Disabling QR Code Scanner');
+    logger.debug('[useScanner]: 📠🚫  Disabling QR Code Scanner');
     enabledVar.current = false;
   }, [enabledVar]);
 
@@ -61,21 +53,16 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
     async (address: string) => {
       haptics.notificationSuccess();
       analytics.track('Scanned address QR code');
-      const ensName = isENSAddressFormat(address)
-        ? address
-        : await fetchReverseRecordWithRetry(address);
+      const ensName = isENSAddressFormat(address) ? address : await fetchReverseRecordWithRetry(address);
       // First navigate to wallet screen
       navigate(Routes.WALLET_SCREEN);
 
       // And then navigate to Profile sheet
       InteractionManager.runAfterInteractions(() => {
-        Navigation.handleAction(
-          profilesEnabled ? Routes.PROFILE_SHEET : Routes.SHOWCASE_SHEET,
-          {
-            address: ensName || address,
-            fromRoute: 'QR Code',
-          }
-        );
+        Navigation.handleAction(profilesEnabled ? Routes.PROFILE_SHEET : Routes.SHOWCASE_SHEET, {
+          address: ensName || address,
+          fromRoute: 'QR Code',
+        });
 
         setTimeout(onSuccess, 500);
       });
@@ -89,24 +76,19 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       analytics.track('Scanned Rainbow profile url');
 
       const urlObj = new URL(url);
-      const addressOrENS = urlObj.pathname?.split('/')?.[1] || '';
+      const addressOrENS = urlObj.pathname?.split('/profile/')?.[1] || '';
       const isValid = await checkIsValidAddressOrDomain(addressOrENS);
       if (isValid) {
-        const ensName = isENSAddressFormat(addressOrENS)
-          ? addressOrENS
-          : await fetchReverseRecordWithRetry(addressOrENS);
+        const ensName = isENSAddressFormat(addressOrENS) ? addressOrENS : await fetchReverseRecordWithRetry(addressOrENS);
         // First navigate to wallet screen
         navigate(Routes.WALLET_SCREEN);
 
         // And then navigate to Profile sheet
         InteractionManager.runAfterInteractions(() => {
-          Navigation.handleAction(
-            profilesEnabled ? Routes.PROFILE_SHEET : Routes.SHOWCASE_SHEET,
-            {
-              address: ensName,
-              fromRoute: 'QR Code',
-            }
-          );
+          Navigation.handleAction(profilesEnabled ? Routes.PROFILE_SHEET : Routes.SHOWCASE_SHEET, {
+            address: ensName,
+            fromRoute: 'QR Code',
+          });
 
           setTimeout(onSuccess, 500);
         });
@@ -124,16 +106,14 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       onSuccess();
       try {
         const { version } = parseUri(uri);
-        if (version === 1) {
-          await walletConnectOnSessionRequest(uri, connector, () => {});
-        } else if (version === 2) {
+        if (version === 2) {
           await pairWalletConnect({ uri, connector });
         }
-      } catch (e) {
-        logger.log('walletConnectOnSessionRequest exception', e);
+      } catch (error) {
+        logger.error(new RainbowError(`[useScanner]: Error handling WalletConnect QR code: ${error}`));
       }
     },
-    [goBack, onSuccess, walletConnectOnSessionRequest]
+    [goBack, onSuccess]
   );
 
   const handleScanInvalid = useCallback(
@@ -164,11 +144,7 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       }
       const address = await addressUtils.getEthereumAddressFromQRCodeData(data);
       // Ethereum address (no ethereum: prefix)
-      if (
-        data.startsWith('0x') &&
-        address !== null &&
-        isValidAddress(address)
-      ) {
+      if (data.startsWith('0x') && address !== null && isValidAddress(address)) {
         return handleScanAddress(address);
       }
       // Walletconnect QR Code
@@ -177,10 +153,7 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       }
       // Walletconnect via universal link
       const urlObj = new URL(data);
-      if (
-        urlObj?.protocol === 'https:' &&
-        urlObj?.pathname?.split('/')?.[1] === 'wc'
-      ) {
+      if (urlObj?.protocol === 'https:' && urlObj?.pathname?.split('/')?.[1] === 'wc') {
         // @ts-expect-error ts-migrate(2722) FIXME: Cannot invoke an object which is possibly 'undefin... Remove this comment to see the full error message
         const { uri, connector } = qs.parse(urlObj.query.substring(1));
         onSuccess();
@@ -197,9 +170,7 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       }
 
       if (lowerCaseData.startsWith(`https://collectors.poap.xyz/mint/`)) {
-        const qrHash = lowerCaseData.split(
-          'https://collectors.poap.xyz/mint/'
-        )?.[1];
+        const qrHash = lowerCaseData.split('https://collectors.poap.xyz/mint/')?.[1];
         return getPoapAndOpenSheetWithQRHash(qrHash, true);
       }
 
@@ -214,17 +185,15 @@ export default function useScanner(enabled: boolean, onSuccess: () => unknown) {
       }
 
       if (lowerCaseData.startsWith(`${RAINBOW_PROFILES_BASE_URL}/poap`)) {
-        const secretWordOrQrHash = lowerCaseData.split(
-          `${RAINBOW_PROFILES_BASE_URL}/poap/`
-        )?.[1];
-        logger.log('onScan: handling poap scan', { secretWordOrQrHash });
+        const secretWordOrQrHash = lowerCaseData.split(`${RAINBOW_PROFILES_BASE_URL}/poap/`)?.[1];
+        logger.debug('[useScanner]: handling poap scan', { secretWordOrQrHash });
         await getPoapAndOpenSheetWithSecretWord(secretWordOrQrHash, true);
         return getPoapAndOpenSheetWithQRHash(secretWordOrQrHash, true);
       }
 
       if (lowerCaseData.startsWith(`rainbow://poap`)) {
         const secretWordOrQrHash = lowerCaseData.split(`rainbow://poap/`)?.[1];
-        logger.log('onScan: handling poap scan', { secretWordOrQrHash });
+        logger.debug('[useScanner]: handling poap scan', { secretWordOrQrHash });
         await getPoapAndOpenSheetWithSecretWord(secretWordOrQrHash, true);
         return getPoapAndOpenSheetWithQRHash(secretWordOrQrHash, true);
       }

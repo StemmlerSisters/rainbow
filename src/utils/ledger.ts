@@ -21,22 +21,18 @@ export const ledgerErrorHandler = (error: Error) => {
   if (error.message.includes('0x6511')) {
     return LEDGER_ERROR_CODES.NO_ETH_APP;
   }
-  if (
-    error.name.includes('BleError') ||
-    error.message.includes('0x6b0c') ||
-    error.message.includes('busy')
-  ) {
+  if (error.name.includes('BleError') || error.message.includes('0x6b0c') || error.message.includes('busy')) {
     return LEDGER_ERROR_CODES.OFF_OR_LOCKED;
   }
   if (error.name.includes('Disconnected')) {
-    logger.error(new RainbowError('[Ledger] - Disconnected Error'), {
+    logger.error(new RainbowError(`[ledger]: Disconnected Error`), {
       name: error.name,
       message: error.message,
     });
     return LEDGER_ERROR_CODES.DISCONNECTED;
   }
 
-  logger.error(new RainbowError('[LedgerConnect] - Unknown Error'), {
+  logger.error(new RainbowError(`[ledger]: Unknown Error`), {
     name: error.name,
     message: error.message,
   });
@@ -66,12 +62,12 @@ export const checkLedgerConnection = async ({
   ethApp
     .getAddress(path)
     .then(res => {
-      logger.info('[checkLedgerConnection] - ledger is ready', {});
+      logger.debug(`[ledger]: ledger is ready`, {});
       successCallback?.(deviceId);
     })
     .catch(e => {
       const errorType = ledgerErrorHandler(e);
-      logger.warn('[checkLedgerConnection] - ledger is not ready', {
+      logger.warn('[ledger] - ledger is not ready', {
         errorType: errorType,
         error: e,
       });

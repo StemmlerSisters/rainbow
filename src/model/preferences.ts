@@ -1,26 +1,10 @@
 import { RainbowFetchClient } from '../rainbow-fetch';
 import { EthereumAddress } from '@/entities';
-import {
-  getSignatureForSigningWalletAndCreateSignatureIfNeeded,
-  signWithSigningWallet,
-} from '@/helpers/signingWallet';
+import { getSignatureForSigningWalletAndCreateSignatureIfNeeded, signWithSigningWallet } from '@/helpers/signingWallet';
 import { logger } from '@/logger';
-
-export enum PreferenceActionType {
-  update = 'update',
-  remove = 'remove',
-  wipe = 'wipe',
-  init = 'init',
-}
-
-export interface PreferencesResponse {
-  success: boolean;
-  reason: string;
-  data?: Record<string, unknown> | undefined;
-}
+import { Address } from 'viem';
 
 export const PREFS_ENDPOINT = 'https://api.rainbow.me';
-
 const preferencesAPI = new RainbowFetchClient({
   headers: {
     'Accept': 'application/json',
@@ -29,16 +13,70 @@ const preferencesAPI = new RainbowFetchClient({
   timeout: 30000, // 30 secs
 });
 
-export async function setPreference(
+export enum PreferenceActionType {
+  update = 'update',
+  remove = 'remove',
+  wipe = 'wipe',
+  init = 'init',
+}
+
+export enum PreferenceKeys {
+  showcase = 'showcase',
+  profile = 'profile',
+}
+
+type TokenContract = Address;
+type TokenId = string;
+
+type TokenContractWithId = `${TokenContract}_${TokenId}`;
+
+type HiddenPreferencesData = {
+  hidden: {
+    ids: [];
+  };
+};
+
+type ShowcasePreferencesData = {
+  showcase: {
+    ids: TokenContractWithId[];
+  };
+};
+
+type Profile = {
+  accountColor: string;
+  accountSymbol: string | null;
+};
+
+type ProfilePreferencesData = {
+  profile: Profile;
+};
+
+type PreferencesDataMap = {
+  showcase: ShowcasePreferencesData;
+  profile: ProfilePreferencesData;
+  hidden: HiddenPreferencesData;
+};
+
+type PayloadMap = {
+  showcase: string[];
+  profile: Profile;
+  hidden: string[];
+};
+
+type PreferencesResponse<T extends keyof PreferencesDataMap> = {
+  success: boolean;
+  data?: T extends keyof PreferencesDataMap ? PreferencesDataMap[T] : never;
+  reason?: string;
+};
+
+export async function setPreference<K extends keyof PreferencesDataMap>(
   action: PreferenceActionType,
-  key: string,
+  key: K,
   address: EthereumAddress,
-  value?: any | undefined
+  value?: PayloadMap[K]
 ): Promise<boolean> {
   try {
-    const signature = await getSignatureForSigningWalletAndCreateSignatureIfNeeded(
-      address
-    );
+    const signature = await getSignatureForSigningWalletAndCreateSignatureIfNeeded(address);
     if (!signature) {
       return false;
     }
@@ -50,43 +88,52 @@ export async function setPreference(
     };
     const message = JSON.stringify(objToSign);
     const signature2 = await signWithSigningWallet(message);
-    logger.debug('☁️  SENDING ', { message });
-    const response = await preferencesAPI.post(`${PREFS_ENDPOINT}/${key}`, {
+    logger.debug(`[preferences]: ☁️  SENDING `, { message });
+    const { data } = await preferencesAPI.post<PreferencesResponse<K>>(`${PREFS_ENDPOINT}/${key}`, {
       message,
       signature,
       signature2,
     });
-    const responseData: PreferencesResponse = response.data as PreferencesResponse;
-    logger.debug('☁️  RESPONSE', {
-      reason: responseData?.reason,
-      success: responseData?.success,
+    logger.debug(`[preferences]: ☁️  RESPONSE`, {
+      reason: data?.reason,
+      success: data?.success,
     });
-    return responseData?.success;
+
+    if (!data.data) {
+      throw new Error('Failed to set preference');
+    }
+
+    return data?.success;
   } catch (e) {
-    logger.warn(`Preferences API failed to set preference`, {
+    logger.warn(`[preferences]: Preferences API failed to set preference`, {
       preferenceKey: key,
     });
     return false;
   }
 }
 
-export async function getPreference(
-  key: string,
+export async function getPreference<K extends keyof PreferencesDataMap>(
+  key: K,
   address: EthereumAddress
-): Promise<any | null> {
+): Promise<PreferencesDataMap[K] | null> {
   try {
-    const response = await preferencesAPI.get(`${PREFS_ENDPOINT}/${key}`, {
+    const { data } = await preferencesAPI.get<PreferencesResponse<K>>(`${PREFS_ENDPOINT}/${key}`, {
       params: { address },
     });
-    const responseData: PreferencesResponse = response.data as PreferencesResponse;
-    logger.debug('☁️  RESPONSE', {
-      reason: responseData?.reason,
-      success: responseData?.success,
+    logger.debug(`[preferences]: ☁️  RESPONSE`, {
+      reason: data?.reason,
+      success: data?.success,
     });
-    return responseData?.data || null;
+
+    if (!data.data) {
+      return null;
+    }
+
+    return data.data;
   } catch (e) {
-    logger.warn(`Preferences API failed to get preference`, {
+    logger.warn(`[preferences]: Preferences API failed to get preference`, {
       preferenceKey: key,
+      error: e,
     });
     return null;
   }

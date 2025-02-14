@@ -1,4 +1,4 @@
-import { Network } from '../helpers/networkTypes';
+import { ChainId, Network } from '@/state/backendNetworks/types';
 import { AssetContract, AssetType } from '.';
 
 interface UniqueAssetLastSale {
@@ -11,6 +11,7 @@ interface UniqueAssetLastSale {
 
 export interface UniqueAsset {
   animation_url?: string | null;
+  chainId: ChainId;
   description?: string | null;
   external_link?: string | null;
   image_original_url?: string | null;
@@ -23,6 +24,7 @@ export interface UniqueAsset {
   traits: UniqueAssetTrait[];
   asset_contract: AssetContract;
   background: string | null;
+  acquisition_date: string | undefined;
   collection: {
     description?: string | null;
     discord_url?: string | null;

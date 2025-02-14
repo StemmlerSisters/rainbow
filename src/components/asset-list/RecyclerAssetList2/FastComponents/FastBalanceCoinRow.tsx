@@ -1,15 +1,18 @@
 import React, { useCallback, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { CoinIconIndicator } from '../../../../components/coin-icon';
-import { Icon } from '../../../../components/icons';
-import { ButtonPressAnimation } from '../../../animations';
+import { CoinIconIndicator } from '@/components/coin-icon';
+import { Icon } from '@/components/icons';
+import { ButtonPressAnimation } from '@/components/animations';
 
 import { ExtendedState } from '../core/RawRecyclerList';
-import FastCoinIcon from './FastCoinIcon';
+
 import { Text } from '@/design-system';
 import { useAccountAsset, useCoinListFinishEditingOptions } from '@/hooks';
 import Routes from '@/navigation/routesNames';
 import { borders, colors, padding, shadow } from '@/styles';
+import RainbowCoinIcon from '@/components/coin-icon/RainbowCoinIcon';
+import { NativeCurrencyKey } from '@/entities';
+import { ChainId } from '@/state/backendNetworks/types';
 
 interface CoinCheckButtonProps {
   isHidden: boolean;
@@ -19,13 +22,7 @@ interface CoinCheckButtonProps {
   theme: any;
 }
 
-const CoinCheckButton = React.memo(function CoinCheckButton({
-  isHidden,
-  isPinned,
-  onPress,
-  uniqueId,
-  theme,
-}: CoinCheckButtonProps) {
+const CoinCheckButton = React.memo(function CoinCheckButton({ isHidden, isPinned, onPress, uniqueId, theme }: CoinCheckButtonProps) {
   const { selectedItems } = useCoinListFinishEditingOptions();
   const selected = selectedItems.includes(uniqueId);
 
@@ -33,40 +30,19 @@ const CoinCheckButton = React.memo(function CoinCheckButton({
   const coinIconPlaceholder = !selected && (isHidden || isPinned);
 
   const checkmarkBackgroundDynamicStyle = {
-    ...shadow.buildAsObject(
-      0,
-      4,
-      12,
-      theme.isDarkMode ? colors.shadow : colors.appleBlue,
-      0.4
-    ),
+    ...shadow.buildAsObject(0, 4, 12, theme.isDarkMode ? colors.shadow : colors.appleBlue, 0.4),
   };
 
   return (
     <View style={sx.checkboxContainer}>
       <ButtonPressAnimation onPress={onPress}>
         <View style={sx.checkboxInnerContainer}>
-          {showOutline && (
-            <View
-              style={[
-                sx.circleOutline,
-                { borderColor: colors.alpha(colors.blueGreyDark, 0.12) },
-              ]}
-            />
-          )}
+          {showOutline && <View style={[sx.circleOutline, { borderColor: colors.alpha(colors.blueGreyDark, 0.12) }]} />}
 
-          {coinIconPlaceholder && (
-            <CoinIconIndicator
-              isPinned={isPinned}
-              style={sx.coinIconIndicator}
-              theme={theme}
-            />
-          )}
+          {coinIconPlaceholder && <CoinIconIndicator isPinned={isPinned} style={sx.coinIconIndicator} theme={theme} />}
 
           {selected && (
-            <View
-              style={[sx.checkmarkBackground, checkmarkBackgroundDynamicStyle]}
-            >
+            <View style={[sx.checkmarkBackground, checkmarkBackgroundDynamicStyle]}>
               <Icon color="white" name="checkmark" />
             </View>
           )}
@@ -76,12 +52,11 @@ const CoinCheckButton = React.memo(function CoinCheckButton({
   );
 });
 
-const formatPercentageString = (percentString?: string) =>
-  percentString ? percentString.split('-').join('- ') : '-';
+const formatPercentageString = (percentString?: string) => (percentString ? percentString.split('-').join('- ') : '-');
 
 interface MemoizedBalanceCoinRowProps {
   uniqueId: string;
-  nativeCurrency: string;
+  nativeCurrency: NativeCurrencyKey;
   theme: any;
   navigate: any;
   nativeCurrencySymbol: string;
@@ -90,104 +65,65 @@ interface MemoizedBalanceCoinRowProps {
 }
 
 const MemoizedBalanceCoinRow = React.memo(
-  ({
-    uniqueId,
-    nativeCurrency,
-    theme,
-    navigate,
-    nativeCurrencySymbol,
-    isHidden,
-    maybeCallback,
-  }: MemoizedBalanceCoinRowProps) => {
+  ({ uniqueId, nativeCurrency, theme, navigate, nativeCurrencySymbol, isHidden, maybeCallback }: MemoizedBalanceCoinRowProps) => {
     const item = useAccountAsset(uniqueId, nativeCurrency);
 
     const handlePress = useCallback(() => {
       if (maybeCallback.current) {
         maybeCallback.current();
       } else {
-        navigate(Routes.EXPANDED_ASSET_SHEET, {
-          asset: item,
-          fromDiscover: true,
-          isFromWalletScreen: true,
-          type: 'token',
-        });
+        if (!item) return;
+        navigate(Routes.EXPANDED_ASSET_SHEET_V2, { asset: item, address: item.address, chainId: item.chainId });
       }
     }, [navigate, item, maybeCallback]);
 
-    const percentChange = item?.native?.change;
+    const percentChange = item?.native?.change || undefined;
     const percentageChangeDisplay = formatPercentageString(percentChange);
 
-    const isPositive =
-      percentChange && percentageChangeDisplay.charAt(0) !== '-';
+    const isPositive = percentChange && percentageChangeDisplay.charAt(0) !== '-';
 
-    const changeColor = isPositive
-      ? theme.colors.green
-      : theme.colors.blueGreyDark50;
+    const changeColor = isPositive ? theme.colors.green : theme.colors.blueGreyDark50;
 
     const nativeDisplay = item?.balance?.display;
 
-    const valueColor = nativeDisplay
-      ? theme.colors.dark
-      : theme.colors.blueGreyLight;
+    const valueColor = nativeDisplay ? theme.colors.dark : theme.colors.blueGreyLight;
+
+    const chainId = item?.chainId || ChainId.mainnet;
 
     return (
-      <View style={sx.flex}>
-        <ButtonPressAnimation
-          onPress={handlePress}
-          scaleTo={0.96}
-          testID={`balance-coin-row-${item.name}`}
-        >
+      <View style={sx.flex} testID={'fast-coin-info'}>
+        <ButtonPressAnimation onPress={handlePress} scaleTo={0.96} testID={`balance-coin-row-${item?.name}`}>
           <View style={[sx.container]}>
-            <FastCoinIcon
-              address={item.address}
-              assetType={item.type}
-              mainnetAddress={item.mainnet_address}
-              symbol={item.symbol}
-              theme={theme}
-            />
+            <View style={sx.iconContainer}>
+              <RainbowCoinIcon
+                icon={item?.icon_url}
+                chainId={chainId}
+                symbol={item?.symbol || ''}
+                color={item?.colors?.primary || item?.colors?.fallback || undefined}
+              />
+            </View>
 
             <View style={[sx.innerContainer, isHidden && sx.hiddenRow]}>
               <View style={sx.row}>
                 <View style={sx.textWrapper}>
-                  <Text
-                    numberOfLines={1}
-                    color="primary (Deprecated)"
-                    size="16px / 22px (Deprecated)"
-                    weight="semibold"
-                  >
-                    {item.name}
+                  <Text numberOfLines={1} color="primary (Deprecated)" size="16px / 22px (Deprecated)" weight="semibold">
+                    {item?.name}
                   </Text>
                 </View>
 
-                <Text
-                  align="right"
-                  color={{ custom: valueColor }}
-                  size="16px / 22px (Deprecated)"
-                  weight="medium"
-                >
-                  {item?.native?.balance?.display ??
-                    `${nativeCurrencySymbol}0.00`}
+                <Text align="right" color={{ custom: valueColor }} size="16px / 22px (Deprecated)" weight="medium">
+                  {item?.native?.balance?.display ?? `${nativeCurrencySymbol}0.00`}
                 </Text>
               </View>
 
               <View style={[sx.row, sx.bottom]}>
                 <View style={sx.textWrapper}>
-                  <Text
-                    color={{ custom: theme.colors.blueGreyDark50 }}
-                    numberOfLines={1}
-                    size="14px / 19px (Deprecated)"
-                    weight="medium"
-                  >
+                  <Text color={{ custom: theme.colors.blueGreyDark50 }} numberOfLines={1} size="14px / 19px (Deprecated)" weight="medium">
                     {nativeDisplay ?? ''}
                   </Text>
                 </View>
 
-                <Text
-                  align="right"
-                  color={{ custom: changeColor }}
-                  size="14px / 19px (Deprecated)"
-                  weight="medium"
-                >
+                <Text align="right" color={{ custom: changeColor }} size="14px / 19px (Deprecated)" weight="medium">
                   {percentageChangeDisplay}
                 </Text>
               </View>
@@ -201,23 +137,9 @@ const MemoizedBalanceCoinRow = React.memo(
 
 MemoizedBalanceCoinRow.displayName = 'MemoizedBalanceCoinRow';
 
-export default React.memo(function BalanceCoinRow({
-  uniqueId,
-  extendedState,
-}: {
-  uniqueId: string;
-  extendedState: ExtendedState;
-}) {
-  const {
-    theme,
-    nativeCurrencySymbol,
-    navigate,
-    nativeCurrency,
-    hiddenCoins,
-    pinnedCoins,
-    toggleSelectedCoin,
-    isCoinListEdited,
-  } = extendedState;
+export default React.memo(function BalanceCoinRow({ uniqueId, extendedState }: { uniqueId: string; extendedState: ExtendedState }) {
+  const { theme, nativeCurrencySymbol, navigate, nativeCurrency, hiddenAssets, pinnedCoins, toggleSelectedCoin, isCoinListEdited } =
+    extendedState;
 
   const onPress = useCallback(() => {
     toggleSelectedCoin(uniqueId);
@@ -228,20 +150,12 @@ export default React.memo(function BalanceCoinRow({
   const maybeCallback = useRef<null | (() => void)>(null);
   maybeCallback.current = isCoinListEdited ? onPress : null;
 
-  const isHidden = hiddenCoins[uniqueId];
+  const isHidden = hiddenAssets.has(uniqueId);
   const isPinned = pinnedCoins[uniqueId];
 
   return (
     <View style={[sx.rootContainer, !isCoinListEdited && sx.nonEditMode]}>
-      {isCoinListEdited && (
-        <CoinCheckButton
-          isHidden={isHidden}
-          isPinned={isPinned}
-          onPress={onPress}
-          theme={theme}
-          uniqueId={uniqueId}
-        />
-      )}
+      {isCoinListEdited && <CoinCheckButton isHidden={isHidden} isPinned={isPinned} onPress={onPress} theme={theme} uniqueId={uniqueId} />}
 
       <MemoizedBalanceCoinRow
         isHidden={isHidden}
@@ -259,6 +173,12 @@ export default React.memo(function BalanceCoinRow({
 const sx = StyleSheet.create({
   bottom: {
     marginTop: 10,
+  },
+  iconContainer: {
+    elevation: 6,
+    height: 59,
+    overflow: 'visible',
+    paddingTop: 9,
   },
   checkboxContainer: {
     alignSelf: 'center',

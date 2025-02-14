@@ -3,7 +3,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Share } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { ButtonPressAnimation } from '../animations';
-import { Centered, InnerBorder } from '../layout';
+import { Centered, InnerBorder, Row } from '../layout';
 import { Text } from '../text';
 import styled from '@/styled-thing';
 import ShadowStack from '@/react-native-shadow-stack';
@@ -14,6 +14,8 @@ const Label = styled(Text).attrs(({ theme: { colors } }) => ({
   lineHeight: 'looser',
   size: 'larger',
   weight: 'heavy',
+  ellipsizeMode: 'tail',
+  numberOfLines: 1,
 }))({
   bottom: 2,
 });
@@ -37,20 +39,9 @@ export default function ShareButton({ accountAddress, ...props }) {
   );
 
   return (
-    <ButtonPressAnimation
-      onPress={handlePress}
-      overflowMargin={20}
-      radiusAndroid={28}
-      {...props}
-    >
-      <ShadowStack
-        backgroundColor={isDarkMode ? colors.white : colors.dark}
-        borderRadius={28}
-        height={56}
-        shadows={shadows}
-        width={123}
-      >
-        <Centered cover>
+    <ButtonPressAnimation onPress={handlePress} overflowMargin={20} radiusAndroid={28} {...props}>
+      <ShadowStack backgroundColor={isDarkMode ? colors.white : colors.dark} borderRadius={28} height={56} shadows={shadows} width={200}>
+        <Centered cover style={{ paddingHorizontal: 10 }}>
           <Label>{`􀈂 ${lang.t('button.share')}`}</Label>
         </Centered>
         <InnerBorder />

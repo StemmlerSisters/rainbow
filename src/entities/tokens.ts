@@ -1,7 +1,7 @@
-import { ChainId } from '@rainbow-me/swaps';
-import { AssetType } from './assetTypes';
 import { EthereumAddress } from '.';
-import { Network } from '@/helpers';
+import { Chain } from '@wagmi/chains';
+import { ChainId } from '@/state/backendNetworks/types';
+import { TokenColors } from '@/graphql/__generated__/metadata';
 
 export interface ZerionAssetPrice {
   value: number;
@@ -25,13 +25,9 @@ export interface ZerionAsset {
   name: string;
   symbol: string;
   decimals: number;
-  type?: AssetType | null;
+  type?: string;
   icon_url?: string | null;
   price?: ZerionAssetPrice | null;
-}
-
-export interface SavingsAsset extends Asset {
-  contractAddress: string;
 }
 
 export interface AssetContract {
@@ -52,18 +48,14 @@ type RainbowTokenOwnFields = Omit<RainbowToken, keyof Asset>;
 // `ParsedAddressAsset`. The token metadata is of the type `RainbowToken`, but
 // some fields overlap with the guaranteed `Asset` fields, so the
 // `Partial<RainbowTokenOwnFields>` type is used.
-export interface ParsedAddressAsset
-  extends Asset,
-    Partial<RainbowTokenOwnFields> {
+export interface ParsedAddressAsset extends Asset, Partial<RainbowTokenOwnFields> {
   balance?: {
     amount?: string;
     display?: string;
   };
+  chainId: number;
   color?: string;
-  colors?: {
-    primary?: string;
-    fallback?: string;
-  };
+  colors?: TokenColors;
   icon_url?: string;
   price?: {
     changed_at?: number;
@@ -71,12 +63,23 @@ export interface ParsedAddressAsset
     value?: number;
   };
   asset_contract?: AssetContract;
-  type: string;
-  id: string;
+  type?: string;
+  id?: string;
   uniqueId: string;
+  native?: {
+    balance?: {
+      amount?: string;
+      display?: string;
+    };
+    change?: string;
+    price?: {
+      amount?: string;
+      display?: string;
+    };
+  };
   mainnet_address?: EthereumAddress;
   isNativeAsset?: boolean;
-  network?: Network;
+  network: string;
 }
 
 export interface SwappableAsset extends ParsedAddressAsset {
@@ -88,10 +91,33 @@ export interface SwappableAsset extends ParsedAddressAsset {
   implementations?: {
     [network: string]: { address: EthereumAddress; decimals: number };
   };
-  network?: Network;
+}
+
+export interface TokenSearchNetwork {
+  address: string;
+  decimals: number;
+}
+
+export interface TokenSearchToken {
+  decimals: number;
+  highLiquidity: boolean;
+  name: string;
+  symbol: string;
+  uniqueId: string;
+  colors: { primary: string; fallback: string };
+  icon_url: string;
+  color: string;
+  shadowColor: string;
+  rainbowMetadataId: number;
+  isRainbowCurated: boolean;
+  isVerified: boolean;
+  networks: {
+    [chainId in Chain['id']]: TokenSearchNetwork;
+  };
 }
 
 export interface RainbowToken extends Asset {
+  chainId: ChainId;
   color?: string;
   highLiquidity?: boolean;
   totalLiquidity?: number;
@@ -100,7 +126,8 @@ export interface RainbowToken extends Asset {
   isVerified?: boolean;
   shadowColor?: string;
   uniqueId: string;
-  type: string;
+  type?: string;
+  network: string;
   mainnet_address?: EthereumAddress;
   networks?: any;
 }

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { lightModeThemeColors } from '../styles/colors';
 import { ParsedAddressAsset } from '@/entities';
 import { ethereumUtils, isETH, pseudoRandomArrayItemFromString } from '@/utils';
+import { getHighContrastColor } from './useAccountAccentColor';
 import { usePersistentDominantColorFromImage } from './usePersistentDominantColorFromImage';
 
 export default function useColorForAsset(
@@ -12,28 +13,24 @@ export default function useColorForAsset(
 ) {
   // @ts-expect-error ts-migrate(2304) FIXME: Cannot find name 'useTheme'.
   const { isDarkMode: isDarkModeTheme, colors } = useTheme();
-  const accountAsset = ethereumUtils.getAssetFromAllAssets(
-    asset?.uniqueId || asset?.mainnet_address || asset?.address
-  );
-  const resolvedAddress =
-    asset?.mainnet_address || asset?.address || accountAsset?.address;
+  const accountAsset = ethereumUtils.getAssetFromAllAssets(asset?.uniqueId || asset?.mainnet_address || asset?.address);
+  const resolvedAddress = asset?.mainnet_address || asset?.address || accountAsset?.address;
 
-  const derivedColor = usePersistentDominantColorFromImage(
-    accountAsset?.icon_url || asset?.icon_url
-  );
+  const derivedColor = usePersistentDominantColorFromImage(accountAsset?.icon_url || asset?.icon_url);
   const isDarkMode = forceLightMode || isDarkModeTheme;
 
   const colorDerivedFromAddress = useMemo(() => {
+    if (!resolvedAddress) {
+      return undefined;
+    }
+
     const color = isETH(resolvedAddress)
       ? isDarkMode
         ? forceETHColor
           ? colors.appleBlue
           : colors.brighten(lightModeThemeColors.dark)
         : colors.dark
-      : pseudoRandomArrayItemFromString(
-          resolvedAddress,
-          colors.avatarBackgrounds
-        );
+      : pseudoRandomArrayItemFromString(resolvedAddress, colors.avatarBackgrounds);
     return color;
   }, [colors, forceETHColor, isDarkMode, resolvedAddress]);
 
@@ -73,6 +70,8 @@ export default function useColorForAsset(
       // brighten up dark colors in dark mode
       if (isDarkMode && colors.isColorDark(color2Return)) {
         return colors.brighten(color2Return);
+      } else if (!isDarkMode) {
+        return getHighContrastColor(color2Return, isDarkMode);
       }
       return color2Return;
     } catch (e) {

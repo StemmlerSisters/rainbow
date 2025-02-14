@@ -1,8 +1,9 @@
 import { Dispatch } from 'redux';
 import { getContacts, saveContacts } from '@/handlers/localstorage/contacts';
-import { Network } from '@/helpers/networkTypes';
 import { omitFlatten } from '@/helpers/utilities';
 import { AppGetState } from '@/redux/store';
+import { handleReviewPromptAction } from '@/utils/reviewAlert';
+import { ReviewPromptAction } from '@/storage/schema';
 
 // -- Constants --------------------------------------- //
 const CONTACTS_UPDATE = 'contacts/CONTACTS_UPDATE';
@@ -32,11 +33,6 @@ export interface Contact {
   ens: string;
 
   /**
-   * The network.
-   */
-  network: Network;
-
-  /**
    * The contact's nickname.
    */
   nickname: string;
@@ -54,10 +50,7 @@ interface ContactsState {
 /**
  * An action for the `contacts` reducer.
  */
-type ContactsAction =
-  | ContactsUpdateAction
-  | ContactsLoadAction
-  | ContactsClearStateAction;
+type ContactsAction = ContactsUpdateAction | ContactsLoadAction | ContactsClearStateAction;
 
 interface ContactsUpdateAction {
   type: typeof CONTACTS_UPDATE;
@@ -74,9 +67,7 @@ interface ContactsClearStateAction {
 }
 
 // -- Actions ---------------------------------------- //
-export const contactsLoadState = () => async (
-  dispatch: Dispatch<ContactsLoadAction>
-) => {
+export const contactsLoadState = () => async (dispatch: Dispatch<ContactsLoadAction>) => {
   try {
     const contacts = (await getContacts()) as ContactsState['contacts'];
     dispatch({
@@ -87,36 +78,31 @@ export const contactsLoadState = () => async (
   } catch (error) {}
 };
 
-export const contactsAddOrUpdate = (
-  address: string,
-  nickname: string,
-  color: number,
-  network: Network,
-  ens: string
-) => (dispatch: Dispatch<ContactsUpdateAction>, getState: AppGetState) => {
-  const loweredAddress = address.toLowerCase();
-  const { contacts } = getState().contacts;
-  const updatedContacts = {
-    ...contacts,
-    [loweredAddress]: {
-      address: loweredAddress,
-      color,
-      ens,
-      network,
-      nickname,
-    },
-  };
-  saveContacts(updatedContacts);
-  dispatch({
-    payload: updatedContacts,
-    type: CONTACTS_UPDATE,
-  });
-};
+export const contactsAddOrUpdate =
+  (address: string, nickname: string, color: number, ens: string) => (dispatch: Dispatch<ContactsUpdateAction>, getState: AppGetState) => {
+    const loweredAddress = address.toLowerCase();
+    const { contacts } = getState().contacts;
+    const updatedContacts = {
+      ...contacts,
+      [loweredAddress]: {
+        address: loweredAddress,
+        color,
+        ens,
+        nickname,
+      },
+    };
+    saveContacts(updatedContacts);
 
-export const removeContact = (address: string) => (
-  dispatch: Dispatch<ContactsUpdateAction>,
-  getState: AppGetState
-) => {
+    setTimeout(() => {
+      handleReviewPromptAction(ReviewPromptAction.AddingContact);
+    }, 500);
+    dispatch({
+      payload: updatedContacts,
+      type: CONTACTS_UPDATE,
+    });
+  };
+
+export const removeContact = (address: string) => (dispatch: Dispatch<ContactsUpdateAction>, getState: AppGetState) => {
   const { contacts } = getState().contacts;
   const updatedContacts = omitFlatten(contacts, address.toLowerCase());
   saveContacts(updatedContacts);

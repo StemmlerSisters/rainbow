@@ -1,79 +1,82 @@
-import { Contract } from '@ethersproject/contracts';
-import { useQuery } from '@tanstack/react-query';
-import { isEmpty, keys } from 'lodash';
-import { useCallback } from 'react';
-import {
-  saveWalletBalances,
-  WALLET_BALANCES_FROM_STORAGE,
-} from '@/handlers/localstorage/walletBalances';
-import { web3Provider } from '@/handlers/web3';
 import { AllRainbowWallets } from '@/model/wallet';
-import { queryClient } from '@/react-query';
-import { balanceCheckerContractAbi } from '@/references';
-import { fromWei, handleSignificantDecimals } from '@/helpers/utilities';
-import logger from '@/utils/logger';
-import { useSelector } from 'react-redux';
-import { AppState } from '@/redux/store';
-import { getNetworkObj } from '@/networks';
+import { useMemo } from 'react';
+import { Address } from 'viem';
+import useAccountSettings from './useAccountSettings';
+import { useAddysSummary } from '@/resources/summary/summary';
+import { add, convertAmountToNativeDisplay } from '@/helpers/utilities';
 
-const ETH_ADDRESS = '0x0000000000000000000000000000000000000000';
+const QUERY_CONFIG = {
+  staleTime: 60_000, // 1 minute
+  cacheTime: 1000 * 60 * 60 * 24, // 24 hours
+  refetchInterval: 120_000, // 2 minutes
+};
 
-const useWalletBalances = (wallets: AllRainbowWallets) => {
-  const network = useSelector((state: AppState) => state.settings.network);
+export type WalletBalance = {
+  assetBalanceAmount: string;
+  assetBalanceDisplay: string;
+  positionsBalanceAmount: string;
+  positionsBalanceDisplay: string;
+  totalBalanceAmount: string;
+  totalBalanceDisplay: string;
+};
 
-  const fetchBalances = useCallback(async () => {
-    const walletBalances: { [address: string]: string } = {};
+export type WalletBalanceResult = {
+  balances: Record<Address, WalletBalance>;
+  isLoading: boolean;
+};
 
-    // Get list of addresses to get balances for
-    Object.values(wallets).forEach((wallet: any) => {
-      wallet.addresses.forEach((account: any) => {
-        walletBalances[account.address] = '0.00';
-      });
-    });
+/**
+ * Hook to fetch balances for all wallets
+ * @deprecated - you probably want to use useWalletsWithBalancesAndNames instead which accounts for hidden assets balances
+ * @param wallets - All Rainbow wallets
+ * @returns Balances for all wallets
+ */
+const useWalletBalances = (wallets: AllRainbowWallets): WalletBalanceResult => {
+  const { nativeCurrency } = useAccountSettings();
 
-    try {
-      // Check all the ETH balances at once
-      const balanceCheckerContract = new Contract(
-        getNetworkObj(network).balanceCheckerAddress,
-        balanceCheckerContractAbi,
-        web3Provider
-      );
+  const allAddresses = useMemo(
+    () => Object.values(wallets).flatMap(wallet => (wallet.addresses || []).map(account => account.address as Address)),
+    [wallets]
+  );
 
-      const balances = await balanceCheckerContract.balances(
-        keys(walletBalances),
-        [ETH_ADDRESS]
-      );
+  const { data: summaryData, isLoading } = useAddysSummary(
+    {
+      addresses: allAddresses,
+      currency: nativeCurrency,
+    },
+    QUERY_CONFIG
+  );
 
-      Object.keys(walletBalances).forEach((address, index) => {
-        const amountInETH = fromWei(balances[index].toString());
-        const formattedBalance = handleSignificantDecimals(amountInETH, 4);
-        walletBalances[address] = formattedBalance;
-      });
-      saveWalletBalances(walletBalances);
-    } catch (e) {
-      logger.log('Error fetching ETH balances in batch', e);
+  const balances = useMemo(() => {
+    const result: Record<Address, WalletBalance> = {};
+
+    if (isLoading) return result;
+
+    for (const address of allAddresses) {
+      const lowerCaseAddress = address.toLowerCase() as Address;
+      const assetBalance = summaryData?.data?.addresses?.[lowerCaseAddress]?.summary?.asset_value?.toString() || '0';
+      const positionsBalance = summaryData?.data?.addresses?.[lowerCaseAddress]?.summary?.positions_value?.toString() || '0';
+      const claimablesBalance = summaryData?.data?.addresses?.[lowerCaseAddress]?.summary?.claimables_value?.toString() || '0';
+
+      const totalAccountBalance = add(assetBalance, add(positionsBalance, claimablesBalance));
+
+      result[lowerCaseAddress] = {
+        assetBalanceAmount: assetBalance,
+        assetBalanceDisplay: convertAmountToNativeDisplay(assetBalance, nativeCurrency),
+        positionsBalanceAmount: positionsBalance,
+        positionsBalanceDisplay: convertAmountToNativeDisplay(positionsBalance, nativeCurrency),
+        totalBalanceAmount: totalAccountBalance,
+        totalBalanceDisplay: convertAmountToNativeDisplay(totalAccountBalance, nativeCurrency),
+      };
     }
 
-    return walletBalances;
-  }, [network, wallets]);
+    return result;
+  }, [isLoading, allAddresses, summaryData?.data?.addresses, nativeCurrency]);
 
-  const { data } = useQuery(['walletBalances'], fetchBalances, {
-    enabled: !isEmpty(wallets),
-  });
-
-  const resultFromStorage = queryClient.getQueryData<{
-    [address: string]: string;
-  }>([WALLET_BALANCES_FROM_STORAGE]);
-
-  if (isEmpty(data) && !isEmpty(resultFromStorage)) {
-    return resultFromStorage;
-  }
-
-  if (isEmpty(data)) {
-    return {};
-  }
-
-  return data;
+  return {
+    balances,
+    isLoading,
+  };
 };
 
 export default useWalletBalances;

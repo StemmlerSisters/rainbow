@@ -1,45 +1,34 @@
 import lang from 'i18n-js';
-import React, { createElement, Fragment } from 'react';
+import React, { Fragment } from 'react';
 import { Share } from 'react-native';
-import Divider from '../Divider';
+import Divider from '@/components/Divider';
 import { ButtonPressAnimation } from '../animations';
 import CoinDividerButtonLabel from '../coin-divider/CoinDividerButtonLabel';
 import { ContextMenu } from '../context-menu';
 import { Column, Row } from '../layout';
 import { SavingsListHeader } from '../savings';
 import { H1 } from '../text';
-import {
-  useAccountProfile,
-  useAccountSettings,
-  useDimensions,
-  useWallets,
-  useWebData,
-} from '@/hooks';
+import { useAccountProfile, useAccountSettings, useDimensions, useWallets, useWebData } from '@/hooks';
 import { RAINBOW_PROFILES_BASE_URL } from '@/references';
 import styled from '@/styled-thing';
 import { padding } from '@/styles';
+import * as i18n from '@/languages';
 
-export const ListHeaderHeight = 50;
+export const ListHeaderHeight = 48;
 
 const ShareCollectiblesBPA = styled(ButtonPressAnimation)({
-  backgroundColor: ({ theme: { colors } }) =>
-    colors.alpha(colors.blueGreyDark, 0.06),
+  backgroundColor: ({ theme: { colors } }) => colors.alpha(colors.blueGreyDark, 0.06),
   borderRadius: 15,
   height: 30,
   justifyContent: 'center',
-  maxWidth: 90,
   paddingBottom: 5,
   paddingTop: 5,
-  width: 90,
+  paddingHorizontal: 10,
 });
 
 const ShareCollectiblesButton = ({ onPress }) => (
   <ShareCollectiblesBPA onPress={onPress} scale={0.9}>
-    <CoinDividerButtonLabel
-      align="center"
-      label={`􀈂 ${lang.t('button.share')}`}
-      shareButton
-    />
+    <CoinDividerButtonLabel align="center" label={`􀈂 ${lang.t('button.share')}`} shareButton />
   </ShareCollectiblesBPA>
 );
 
@@ -60,15 +49,7 @@ const StickyBackgroundBlocker = styled.View({
   width: ({ deviceDimensions }) => deviceDimensions.width,
 });
 
-export default function ListHeader({
-  children,
-  contextMenuOptions,
-  isCoinListEdited,
-  showDivider = true,
-  title,
-  titleRenderer = H1,
-  totalValue,
-}) {
+export default function ListHeader({ children, contextMenuOptions, isCoinListEdited, showDivider = true, title, totalValue }) {
   const deviceDimensions = useDimensions();
   const { colors, isDarkMode } = useTheme();
   const { isReadOnlyWallet } = useWallets();
@@ -80,21 +61,14 @@ export default function ListHeader({
     if (!isReadOnlyWallet) {
       initializeShowcaseIfNeeded();
     }
-    const showcaseUrl = `${RAINBOW_PROFILES_BASE_URL}/${
-      accountENS || accountAddress
-    }`;
+    const showcaseUrl = `${RAINBOW_PROFILES_BASE_URL}/${accountENS || accountAddress}`;
     const shareOptions = {
       message: isReadOnlyWallet
         ? lang.t('list.share.check_out_this_wallet', { showcaseUrl })
         : lang.t('list.share.check_out_my_wallet', { showcaseUrl }),
     };
     Share.share(shareOptions);
-  }, [
-    accountAddress,
-    accountENS,
-    initializeShowcaseIfNeeded,
-    isReadOnlyWallet,
-  ]);
+  }, [accountAddress, accountENS, initializeShowcaseIfNeeded, isReadOnlyWallet]);
 
   if (title === lang.t('pools.pools_title')) {
     return (
@@ -114,14 +88,14 @@ export default function ListHeader({
           {title && (
             <Row align="center">
               {/* eslint-disable-next-line react/no-children-prop */}
-              {createElement(titleRenderer, { children: title })}
-              {title === 'Collectibles' && (
+              <Row style={{ maxWidth: 200 }}>
+                <H1 ellipsizeMode="tail" numberOfLines={1}>
+                  {title}
+                </H1>
+              </Row>
+              {title === i18n.t(i18n.l.account.tab_collectibles) && (
                 <Column align="flex-end" flex={1}>
-                  <ShareCollectiblesButton
-                    onPress={() =>
-                      handleShare(isReadOnlyWallet, accountAddress)
-                    }
-                  />
+                  <ShareCollectiblesButton onPress={() => handleShare(isReadOnlyWallet, accountAddress)} />
                 </Column>
               )}
               <ContextMenu marginTop={3} {...contextMenuOptions} />
@@ -134,14 +108,9 @@ export default function ListHeader({
            The divider shows up as a white line in dark mode (android)
            so we won't render it till we figure it out why
           */
-          showDivider && !(android && isDarkMode) && (
-            <Divider color={colors.rowDividerLight} />
-          )
+          showDivider && !(android && isDarkMode) && <Divider color={colors.rowDividerLight} />
         }
-        <StickyBackgroundBlocker
-          deviceDimensions={deviceDimensions}
-          isEditMode={isCoinListEdited}
-        />
+        <StickyBackgroundBlocker deviceDimensions={deviceDimensions} isEditMode={isCoinListEdited} />
       </Fragment>
     );
   }

@@ -1,19 +1,8 @@
-import React, {
-  createContext,
-  PropsWithChildren,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import { LayoutAnimation, NativeModules, useColorScheme } from 'react-native';
+import React, { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
+import { Appearance, LayoutAnimation, NativeModules, useColorScheme } from 'react-native';
 import { useDarkMode } from 'react-native-dark-mode';
 import { ThemeProvider } from 'styled-components';
-import {
-  Colors,
-  darkModeThemeColors,
-  lightModeThemeColors,
-} from '../styles/colors';
+import { Colors, darkModeThemeColors, lightModeThemeColors } from '../styles/colors';
 import currentColors from './currentColors';
 import { DesignSystemProvider } from '@/design-system';
 import { getTheme, saveTheme } from '@/handlers/localstorage/theme';
@@ -26,7 +15,7 @@ export const Themes = {
   SYSTEM: 'system',
 } as const;
 
-export type ThemesType = typeof Themes[keyof typeof Themes];
+export type ThemesType = (typeof Themes)[keyof typeof Themes];
 
 export interface ThemeContextProps {
   colors: Colors;
@@ -39,7 +28,7 @@ export interface ThemeContextProps {
 
 export const ThemeContext = createContext<ThemeContextProps>({
   colors: lightModeThemeColors,
-  colorScheme: Themes.LIGHT,
+  colorScheme: Themes.SYSTEM,
   darkScheme: darkModeThemeColors,
   isDarkMode: false,
   lightScheme: lightModeThemeColors,
@@ -48,22 +37,25 @@ export const ThemeContext = createContext<ThemeContextProps>({
 
 const { RNThemeModule } = NativeModules;
 
-export const MainThemeProvider = (
-  props: PropsWithChildren<Record<string, never>>
-) => {
-  const [colorScheme, setColorScheme] = useState<ThemesType | null>(null);
+export const isDarkTheme = async () => {
+  let currentTheme: ThemesType = await getTheme();
 
+  if (currentTheme === Themes.SYSTEM) {
+    const isSystemDarkMode = Appearance.getColorScheme() === 'dark';
+    currentTheme = isSystemDarkMode ? 'dark' : 'light';
+  }
+
+  return currentTheme === Themes.DARK;
+};
+
+export const MainThemeProvider = (props: PropsWithChildren) => {
+  const [colorScheme, setColorScheme] = useState<ThemesType | null>(null);
   // looks like one works on Android and another one on iOS. good.
   const isSystemDarkModeIOS = useDarkMode();
   const isSystemDarkModeAndroid = useColorScheme() === 'dark';
   const isSystemDarkMode = ios ? isSystemDarkModeIOS : isSystemDarkModeAndroid;
 
-  const colorSchemeSystemAdjusted =
-    colorScheme === Themes.SYSTEM
-      ? isSystemDarkMode
-        ? 'dark'
-        : 'light'
-      : colorScheme;
+  const colorSchemeSystemAdjusted = colorScheme === Themes.SYSTEM ? (isSystemDarkMode ? 'dark' : 'light') : colorScheme;
 
   useEffect(() => {
     setTimeout(() => RNThemeModule?.setMode(colorSchemeSystemAdjusted), 400);
@@ -72,18 +64,10 @@ export const MainThemeProvider = (
   // Override default with user preferences
   useEffect(() => {
     const loadUserPref = async () => {
-      const userPref = (await getTheme()) ?? Themes.LIGHT;
-      const userPrefSystemAdjusted =
-        userPref === Themes.SYSTEM
-          ? isSystemDarkMode
-            ? 'dark'
-            : 'light'
-          : userPref;
+      const userPref = (await getTheme()) ?? Themes.SYSTEM;
+      const userPrefSystemAdjusted = userPref === Themes.SYSTEM ? (isSystemDarkMode ? 'dark' : 'light') : userPref;
       currentColors.theme = userPrefSystemAdjusted;
-      currentColors.themedColors =
-        userPrefSystemAdjusted === Themes.DARK
-          ? darkModeThemeColors
-          : lightModeThemeColors;
+      currentColors.themedColors = userPrefSystemAdjusted === Themes.DARK ? darkModeThemeColors : lightModeThemeColors;
       setColorScheme(userPref);
       onHandleStatusBar();
     };
@@ -93,40 +77,27 @@ export const MainThemeProvider = (
   // Listening to changes of device appearance while in run-time
   useEffect(() => {
     if (colorScheme) {
-      // setIsDarkMode(colorScheme === Themes.DARK);
-      saveTheme(colorScheme);
+      saveTheme(colorScheme, isSystemDarkMode);
     }
   }, [colorScheme]);
 
   const currentTheme = useMemo(
     () => ({
-      colors:
-        colorSchemeSystemAdjusted === 'dark'
-          ? darkModeThemeColors
-          : lightModeThemeColors,
+      colors: colorSchemeSystemAdjusted === 'dark' ? darkModeThemeColors : lightModeThemeColors,
       colorScheme,
       darkScheme: darkModeThemeColors,
       isDarkMode: colorSchemeSystemAdjusted === 'dark',
       lightScheme: lightModeThemeColors,
       // Overrides the isDarkMode value will cause re-render inside the context.
       setTheme: (scheme: ThemesType) => {
-        const schemeSystemAdjusted =
-          scheme === Themes.SYSTEM
-            ? isSystemDarkMode
-              ? 'dark'
-              : 'light'
-            : scheme;
+        // eslint-disable-next-line no-nested-ternary
+        const schemeSystemAdjusted = scheme === Themes.SYSTEM ? (isSystemDarkMode ? 'dark' : 'light') : scheme;
         currentColors.theme = schemeSystemAdjusted;
 
-        currentColors.themedColors =
-          schemeSystemAdjusted === Themes.DARK
-            ? darkModeThemeColors
-            : lightModeThemeColors;
+        currentColors.themedColors = schemeSystemAdjusted === Themes.DARK ? darkModeThemeColors : lightModeThemeColors;
         setColorScheme(scheme);
         onHandleStatusBar();
-        LayoutAnimation.configureNext(
-          LayoutAnimation.create(1000, 'easeInEaseOut', 'opacity')
-        );
+        LayoutAnimation.configureNext(LayoutAnimation.create(1000, 'easeInEaseOut', 'opacity'));
       },
     }),
     [colorScheme, colorSchemeSystemAdjusted, isSystemDarkMode]
@@ -140,11 +111,7 @@ export const MainThemeProvider = (
     <StyleThingThemeProvider value={currentTheme}>
       <ThemeProvider theme={currentTheme}>
         <ThemeContext.Provider value={currentTheme}>
-          <DesignSystemProvider
-            colorMode={currentTheme.isDarkMode ? 'dark' : 'light'}
-          >
-            {props.children}
-          </DesignSystemProvider>
+          <DesignSystemProvider colorMode={currentTheme.isDarkMode ? 'dark' : 'light'}>{props.children}</DesignSystemProvider>
         </ThemeContext.Provider>
       </ThemeProvider>
     </StyleThingThemeProvider>
@@ -156,14 +123,8 @@ export const MainThemeProvider = (
  */
 export const useTheme = () => useContext(ThemeContext);
 
-export function withThemeContext<P extends object>(
-  Component: React.ComponentType<P>
-) {
+export function withThemeContext<P extends object>(Component: React.ComponentType<P>) {
   return function WrapperComponent(props: Omit<P, keyof ThemeContextProps>) {
-    return (
-      <ThemeContext.Consumer>
-        {state => <Component {...(props as P)} {...state} />}
-      </ThemeContext.Consumer>
-    );
+    return <ThemeContext.Consumer>{state => <Component {...(props as P)} {...state} />}</ThemeContext.Consumer>;
   };
 }

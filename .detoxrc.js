@@ -1,20 +1,33 @@
 module.exports = {
-  testRunner: 'jest',
-  runnerConfig: 'e2e/jest.e2e.config.js',
-  skipLegacyWorkersInjection: true,
+  testRunner: {
+    $0: 'jest',
+    args: {
+      config: 'e2e/jest.e2e.config.js',
+      _: ['e2e'],
+      bail: true,
+      forceExit: true,
+    },
+  },
   devices: {
-    simulator: {
+    'ios.simulator': {
       type: 'ios.simulator',
+      device: { type: 'iPhone 16 Pro' },
+    },
+    'android.attached': {
+      type: 'android.attached',
       device: {
-        type: 'iPhone 11',
+        adbName: '.*', // any attached device
       },
+    },
+    'android.emulator': {
+      type: 'android.emulator',
+      device: { avdName: 'Pixel_7_Pro_API_34' },
     },
   },
   apps: {
     'ios.release': {
       type: 'ios.app',
-      binaryPath:
-        'ios/build/Build/Products/Release-iphonesimulator/Rainbow.app',
+      binaryPath: 'ios/build/Build/Products/Release-iphonesimulator/Rainbow.app',
       build:
         'xcodebuild -workspace ios/Rainbow.xcworkspace -scheme Rainbow -configuration Release -sdk iphonesimulator -derivedDataPath ios/build',
     },
@@ -24,29 +37,53 @@ module.exports = {
       build:
         'xcodebuild -workspace ios/Rainbow.xcworkspace -scheme Rainbow -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build',
     },
+    'android.release': {
+      type: 'android.apk',
+      binaryPath: './android/app/build/outputs/apk/release/app-release.apk',
+      build: 'cd android && ./gradlew assembleRelease assembleAndroidTest -DtestBuildType=release && cd ..',
+    },
+    'android.debug': {
+      type: 'android.apk',
+      binaryPath: './android/app/build/outputs/apk/debug/app-debug.apk',
+      build: 'cd ./android && ./gradlew assembleDebug assembleAndroidTest -DtestBuildType=debug && cd ..',
+    },
   },
   configurations: {
     'ios.sim.release': {
       app: 'ios.release',
-      device: 'simulator',
+      device: 'ios.simulator',
+      artifacts: {
+        plugins: {
+          screenshot: 'failing',
+        },
+      },
+      behavior: {
+        cleanup: {
+          shutdownDevice: false,
+        },
+      },
     },
     'ios.sim.debug': {
       app: 'ios.debug',
-      device: 'simulator',
-    },
-    'android.emu.debug': {
-      binaryPath: './android/app/build/outputs/apk/debug/app-debug.apk',
-      build:
-        'cd ./android && ./gradlew assembleDebug assembleAndroidTest -DtestBuildType=debug && cd ..',
-      type: 'android.emulator',
-      name: 'Pixel_5_API_31',
+      device: 'ios.simulator',
+      artifacts: {
+        plugins: {
+          screenshot: 'failing',
+        },
+      },
+      behavior: {
+        cleanup: {
+          shutdownDevice: false,
+        },
+      },
     },
     'android.emu.release': {
-      type: 'android.emulator',
-      binaryPath: 'android/app/build/outputs/apk/release/app-release.apk',
-      build:
-        'cd android && ./gradlew assembleRelease assembleAndroidTest -DtestBuildType=release && cd ..',
-      name: 'Pixel_5_API_31',
+      app: 'android.release',
+      device: 'android.emulator',
+    },
+    'android.emu.debug': {
+      app: 'android.debug',
+      device: 'android.emulator',
     },
   },
 };

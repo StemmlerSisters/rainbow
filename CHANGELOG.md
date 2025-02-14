@@ -15,6 +15,1067 @@ and this project adheres to [Semantic Versioning](http://semver.org/)
 
 ### Fixed
 
+## [1.9.58] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.58)
+
+### Changed
+
+- Expanded state phase 1 cleanup (#6422)
+- Made improvements to store creator and createQueryStore (#6435, #6439)
+- Bumped wallet connect dependency to latest version (#6434)
+
+### Fixed
+
+- Fixed an issue where the NFT expanded state floor price was displayed incorrectly (#6428)
+- Fixed some issues related to discover search (#6427)
+- Fixed issues around SafeMath (#6431)
+- Fixed some issues around Rainbow Rewards bridge failures (#6433)
+
+## [1.9.57] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.57)
+
+### Fixed
+
+- Improved swaps flow to ensure we're routing them through the appropriate flow (#6436)
+
+## [1.9.56] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.56)
+
+### Added
+
+- Added better error handling on swaps flow with damaged wallets (#6398)
+- Expanded state v2, phase 1 (#6332)
+
+### Changed
+
+- Implemented new logic for backup prompt (#6388)
+- Bumped rudderstack (#6407)
+- Enabled third party positions to be calculated in address summary (#6404)
+- Query store optimizations (#6413)
+- Updated discover search to v3 endpoint (#6394)
+- Optimized backendNetworks store (#6409)
+- We now prevent e2e flow to run while PRs are in draft mode (#6406)
+- We’ve bumped slippage from 2 to 5 except on the following networks; mainnet, polygon and BSC (#6419)
+- Made significant improvements in the transaction handling architecture (#6390)
+- Bumped react native image crop picker (#6430)
+
+### Fixed
+
+- Fixed a crash that was caused by improper error handling of cloud backup system
+- Fixed an issue where on some Android devices the wallet UX navigation wasn’t scrollable (#6393)
+- Fixed an issue where the wrong native asset was being displayed on SignTransactionSheet (#6395)
+- Fixed inconsistencies between swaps store slippage and shared value (#6399)
+- Fixed emoji size type which was causing a crash on Android (#6421)
+- Fixed an issue with back up prompt not being shown on new wallet creation (#6423, #6426)
+- Fixed a bug where the buy button on a native asset was disabled (#6429)
+
+## [1.9.55] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.55)
+
+### Changed
+
+- Refactored our chain badge system to now come from backend (#6328)
+
+### Fixed
+
+- Fixed a bug with chain icon on trending tokens sort (#6410)
+- Fixed a bug in wallet switcher on Android (#6412)
+
+## [1.9.54] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.54)
+
+### Changed
+
+- Set the default cacheTime to 5 minutes (#6403)
+
+### Fixed
+
+- Nonce logic refactor which fixes base issues with pending transactions (#6402)
+
+## [1.9.53] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.53)
+
+### Added
+
+- Added trending tokens flag to remote config (#6373)
+- We are now tracking failed walletconnect requests (#6304)
+- Wallet switcher v2 (#6318)
+- Wallet Groups (#6314)
+- Added a new zustand store creator to improve performance (#6325)
+
+### Changed
+
+- Made improvements to trending tokens/network switcher (#6372)
+- Cleaned up swaps zustand selectors (#6355)
+- Updated rainbow world app icon contract address (#6381)
+- Improved on charts loading performance (#6387)
+- Made many performance improvements in the app (#6376)
+
+### Fixed
+
+- Fixed broken e2e tests for backups (#6365)
+- Fixed a bug where swap submit button would get stuck on fetching (#6382)
+- Fixed failing transactions on virtuals.io in dapp browser (#6383)
+- Fixed an issue where the Google OAuth prompt would be stuck in a loop on app launch (#6380)
+- Fixed a bug where NFTs were not able to save to device (#6356)
+- Fixed a bug where android wouldn't allow users to install redacted icon (#6389)
+- Fixed a bug where long token names would cause an overlap over price data in trending tokens view (#6391)
+- Fixed a bug where tapping on copy address on wallet screen on Android devices would cause a crash (#6392)
+
+## [1.9.52] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.52)
+
+### Fixed
+
+- Fixed a bug where back up sheet kept showing for imported wallets (#6377)
+- Fixed an issue with isSwappingToTrendingAsset flag not tracking events properly (#6378)
+- Fixed an issue where the icon sheet was not showing up correctly, and we now prioritize back up sheet before the icon sheet (#6379)
+
+## [1.9.51] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.51)
+
+### Added
+
+- Retrieve FID for wallet addresses (#6330)
+- Network Expansion (#6334)
+- Track token lists (#6303)
+- Add default option to dropdown menu for sort (#6359)
+
+### Changed
+
+- User assets migration (#6038)
+- Trending tokens polishes (#6331)
+- Convert `networkColors` to backendNetworks (#6353)
+- Trending tokens / network switcher cleanup (#6372)
+- Backups V2 Follow-up Fixes / Improvements (#6213)
+- Change logic around when to parse into our native formatter (#6360)
+- Support only persisting when search query is undefined (#6358)
+- Use positions value from summary for wallet balance (#6358)
+- Remove zustand selectors that return objects (#6355)
+- Add trending tokens flag to remote config.ts (#6373)
+- Fix and others i18n (#6367)
+
+### Removed
+
+- Trending tokens + network selector + explain sheet remove local networks (#6367)
+
+### Fixed
+
+- Icons hotfixes (#6342, #6345)
+- Selected state for network, timeframe, sort (#6352)
+- Time filters and default to D3 (#6362)
+- Network colors for network switcher (#6361)
+- Prevent backup prompt from firing on import (#6364)
+
+## [1.9.50] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.50)
+
+### Fixed
+
+- Fixed an issue with unlocking app icons (#6342, #6345)
+
+## [1.9.49] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.49)
+
+### Added
+
+- Claim as X (#6193)
+- NFT checker 2.0 (#6293)
+- Added support for inkchain (#6323)
+
+### Changed
+
+- Improved nonce management logic for private mempool handling (#6277)
+- Split e2e into parallel and serial flows to improve CI runs (#6317)
+- Browser animation code cleanup (#6306)
+- Converted network accessors to functions (#6219)
+- Bumped nanoid from 3.3.7 to 3.3.8 in /src/design-system/docs (#6320)
+- Updated default currentNonce value to -1 (#6324)
+- Updated trending tokens query to support backend changes (#6312)
+- Replaced node ack retires with a small delay (#6326)
+- Updated swaps sdk (#6327)
+
+### Fixed
+
+- Fixed an issue with SignTransactionSheet not disabling button on authorization (#6242)
+- Fixed an issue where the sticky header on the wallet screen couldn’t be tapped when scrolled down the page (#6309)
+- Fixed a duplicate wallet initialization issue where initializeWallet was being called multiple times (#6310)
+- Fixed an issue where the wallet height calculation caused a break in the wallet switcher list with wallets up to two accounts (#6315)
+- Fixed a crash on develop regarding TextShadow (#6329)
+
+## [1.9.48] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.48)
+
+### Fixed
+
+- Bumped persist version for positions query. Otherwise, app will crash when serving stale query that does not have new parser that guarantees non-null array fields (#6307)
+
+## [1.9.47] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.47)
+
+### Added
+
+- Added react-native-turbo-haptics on both OS's (#6264)
+- Added trending tokens query (#6288)
+- Implemented active tab flag for dapp browser (#6279)
+- Added translations for claimables, DeFi Positions, WC loading state and swaps v2 bridging (#6295)
+- Added more analytics events for token details, erc20s and nfts (#6287)
+- Added ability to deeplink to swaps (#6178)
+
+### Changed
+
+- Replaced custom native review module with expo-store-review (#6268)
+- Updated mobile app's id'ing number of wallets to match BX (#6278)
+- Dapp Browser upgrades (#6269, #6300)
+- Enable third party defi positions & fix token list exclusion logic (#6299)
+
+### Fixed
+
+- Fixed a crash that would happen when attempting to swap tokens with 0 decimals (#6263)
+- Fixed app store deep links in dapp browser (#6267)
+- Fixed address searches on discover screen (#6272)
+- Fixed wallet telemetry identify for analytics (#6258)
+- Fixed a bug where users weren't able to open points breakdown from points screen (#6284)
+- Fixed an issue where we showed NaN wallet balance (#6283)
+- We now use MMKVObject initial value which fixes the empty default object being recreated (#6290)
+- Fixed the issue where we weren't showing the ledger pairing sheet during swaps confirmation (#6275)
+- Fixed build failures by using appstore connect key for CI (#6294)
+- Fixed a race condition where the wallet list would be static and users couldn't scroll (#6286)
+- Fixed lp badge gradient overflow and android shadows (#6296)
+
+## [1.9.46] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.46)
+
+### Changed
+
+- Remove unused environment configurations (#6254)
+- Added a null check guard to the claimable flow (#6257)
+
+### Fixed
+
+- Fixed an issue in our approve and swap flow that should help overall swap success (#6259)
+- Changed the way we handle flashbots gas so less transactions should fail due to insufficent gas (#6265)
+
+## [1.9.45] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.45)
+
+### Added
+
+- Upgraded to new notifications endpoint for notifications v2 (#6190, #6223, #6229, #6251)
+- Added option to sort NFTs by ascending and descending (#6068)
+- We added isHardwareWallet to swap analytic events (#6238)
+
+### Changed
+
+- Featured results now uses redirect_url for recents (#6203)
+- Removed direct usage of web3Provider (#6200)
+- Now using backend endpoint for determining output based quotes for Swaps v2 (#6212)
+- We now navigate back to last screen after swap confirmation (#6207)
+- ChainSelector row is now fixed at top of list in swaps v2 (#6206)
+- Removed all of WC v1 (#6214)
+- Removed unused references and did updates to ExplainSheet (#6222)
+- Removed Swaps v1 code (#6181, #6250)
+- Updated featured results to use native card styling (#6246)
+- We now exclude hardware wallet related transactions from TTS tracking (#6247)
+- We are now subtracting hidden assets from total wallet balances (#6205)
+- We converted discover screen content to typescript (#6226)
+
+### Fixed
+
+- Fixed broken context menus on asset expanded state in search results (#6209)
+- Fixed a bug with positions total value display (#6185)
+- Fixed CI build issues (#6232, #6225, #6244, #6248)
+- Fixed a crash with animated inputs (#6227)
+- Fixed a bug where balance would show as NaN value (#6239)
+- Fixed transaction details not showing native asset symbol but always showing ETH instead (#6245)
+- Fixed a bug where an empty account balances prevents a swap from being done (#6243)
+- Fixed a bug where Apecoin wasn’t being set as the inputAsset when set as the preferred network (#6252)
+- Fixed a bug where change wallet sheet was missing balance value (#6253)
+
+## [1.9.44] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.44)
+
+### Fixed
+
+- Fixed apechain using mainnet gas prices (#6220)
+
+## [1.9.43] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.43)
+
+### Added
+
+- Added Apechain Support
+
+## [1.9.42] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.42)
+
+### Added
+
+- Added comments watchdog to PRs in github to monitor spam (#6153)
+- Added functionality to hide send button for assets that are not transferable (#6123)
+- Implemented Zeego dropdown menus (#6143)
+- Added a connecting toast for wallet connect connection sheet (#6197)
+
+### Changed
+
+- Converted our send flow to typescript (#6120)
+- Updated Analytics (#6169, #6186, #6195)
+- Made improvements to wallet connect approval/redirect sheet by converting to typescript (#6167)
+- Migrated wallet connect to use WalletKit (#6163)
+- Improvements to claim button (#6165)
+- Updates to swaps v2 logic (#6171)
+- Bumped walletkit to improve wallet connect connections (#6183)
+- Removed transaction inconsistencies and improved type safety (#6137)
+- Upgraded ledger to allow clear signing with updated firmware versions (#5966)
+- Disabled one click auth on wallet connect (#6201)
+- Enabled new features by default (#6192)
+
+### Fixed
+
+- Fixed CI pods to unlock if pod repo update fails (#6168)
+- Fixed wallet connect v2 changeAccount issues (#6160)
+- Fixed ApprovalSheet not using wallet connect v2 isScam flag (#6162)
+- Fixed a bug with network expansion that caused discrepancies in swaps network switcher dropdown (#6149)
+- Fixed a bug where NFT expanded state would cause a crash (#6115)
+- Fixed an issue with MWP from not prompting if dapp metadata retrieval fails (#6164)
+- Fixed an issue where users couldn’t open last weeks points breakdown from points screen (#6166)
+- Fixed a crash on networks while attempting to connect to wallet connect dapp (#6176)
+- Fixed a bug with claimables where data failed to update on app (#6182)
+- Fixed a padding issue for importing ledger devices (#6187)
+- Fixed a crash happening on swaps and also no local images being displayed (#6196)
+- Fixed an issue with CI artifacts being stored with the same name (#6198)
+- Fixed a bug where the gas button wasn't working to change gas speed (#6208)
+
+## [1.9.41] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.41)
+
+### Added
+
+- Added support for typing into native inputs in swap (#6100)
+- Implementation of claimables (#6140, #6141, #6138, #6146, #6155, #6158, #6159)
+
+### Changed
+
+- Updated arbitrum default back to mainnet for WC message signing (#6122)
+- Bumped dependencies for xcode 16 compatibility (#6110)
+- Bumped CI to work with xcode 16/ iOS 18 (#6129)
+- Now using backend to omit certain defi positions from users wallet balance (#6103)
+- We are now filtering out backend driven networks that are internal and not in production (#6148)
+
+### Fixed
+
+- Fixed Spindl featured image resolution on dapp browser (#6114)
+- Fixed a bug where an error would occur during personal signing using MWP (#6142)
+- Updated url navigation to fix a bug in dapp browser (#6150)
+- Fixed a bug with improper gas fee calculation on mainnet (#6125)
+- Fixed a crash on token search for newly added chains (#6147)
+
+## [1.9.40] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.40)
+
+### Fixed
+
+- Fixed a bug with speed up and cancel (#6133)
+
+## [1.9.39] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.39)
+
+### Added
+
+- Added rc-push script for release tracking and cleanup (#6088)
+- Built the react query for addys claimables endpoint along with wallet screen UI (#6071)
+
+### Changed
+
+- Swaps performance improvements (#6050)
+- Improved CI jobs for build and tests for Tophat (#6043, #6089)
+- Removed some test env for some vars that aren’t needed anymore (#6077)
+- userAssetsStore refactor (#6015)
+- Bumped swaps sdk to 0.26 (#6098)
+- Final implementation for network to chainId migration (#6039)
+
+### Fixed
+
+- Fixed swaps spec in e2e so that all assets balances will update correctly (#6060)
+- Fixed an issue with charts where it was using USD for points instead of user’s selected currency (#6051)
+- Fixed an issue on Android nav bar where it was covered by the systems navigation bar (#6053)
+- Fixed e2e flakiness (#6084, #6090)
+- Fixed an issue with opacity on mwp sign txn sheet (#6083)
+- Fixed a crash that happened when searching input token in swaps (#6104)
+- Fixed and issue with degen native asset address, degen ↔ wdegen (#6087, #6091)
+- Fixed a crash on token details chart for cannot read property ‘y’ of undefined (#6009)
+- Fixed issues with remote promo sheets (#6085)
+- Fixed a bug on iOS 18 which caused context menu dismissals (#6112)
+- Fixed a crash that was happening on send flow (#6116)
+- Fixed a bug where the paste button was disabled on swaps flow for android devices (#6118)
+- Fixed an issue where deleting a contact would cause loading issues on send flow (#6119)
+- Fixed a bug where chainId wasn’t being passed in the dapp browser (#6121)
+
+## [1.9.38] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.38)
+
+### Fixed
+
+- Added missing dapp metadata for certain eth actions (#6086)
+- Fixed an issue where Polygon chainID was misconfigured causing some issues with users sends (#6093)
+- Fixed and issue with wrong messages during MWP Flow (#6094)
+
+## [1.9.37] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.37)
+
+### Added
+
+- Implement NFTs v2 Arc endpoint (#5973)
+- Added mutation and queries needed for spindl integration (#6031)
+- Added translations for degen mode and popular in rainbow (#6020)
+- Added featured results to the dapp browser trending dapps section on the discover screen (#6046, #6049)
+- Implemented perceived finality where a pending transaction is detected and confirmed, we are flagging the affected assets’ addresses and refetching updated user assets balances from BE (#6037)
+- Implemented Mobile Wallet Protocol (#6061)
+- Added ability to hide collectibles section (#6073)
+
+### Changed
+
+- Use chainId instead of network parts 1 and 2 (#5981, #5997)
+- Shortened popular tokens list from 6 to 3 (#6028)
+- Removed old logger and cleaned up logging (#6021)
+- Added support for navigating to swap settings as a route (#6036)
+- Upgraded some packages to the latest version (#6040)
+- Cleaned up e2e on Android (#5970)
+- Bumped WC and did some refactoring (#6047, #6064)
+- Bumped webpack from 5.90.3 to 5.94.0 (#6048)
+- Bumped fastlane (#6062)
+
+### Fixed
+
+- Fixed an issue on android where a user couldn’t access dexscreener in the dapp browser (#6003)
+- Fixed Dapp Browser webview height on Android devices (#6004)
+- Fixed Android button navigation colors (#6005)
+- Fixed TokenToBuyList line break in search results when favoriting a token (#6002)
+- Fixed a bug where the terminal UI for ETH rewards was missing (#6007)
+- Fixed a bug where a user’s favorites wouldn’t migrate after updating app (#6029)
+- Fixed an issue where we were not able to build android locally (#6027)
+- Fixed a sentry error boundary crash where users would see the oops something went wrong message (#6044)
+- Fixed an issue when certain sites won’t load if using the http prefix (#6054)
+- Fixed an issue on ERC20 sends that would show contract address instead of recipient address (#6052)
+- Fixed some crashes on PFP button, and send flow (#6063)
+- Fixed a bug where WC was not confirming transactions (#6074)
+- Fixed a bug where attempting to send an ENS caused a crash (#6075)
+- Fixed a discrepancy where gas on l2s were showing higher in send flow than in swaps flow (#6076)
+- Fixed a wrong ID being used for spindl integration (#6078)
+
+## [1.9.36] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.36)
+
+### Fixed
+
+- Fixed Sentry logging issues (#6012, #6018, #6019)
+- Fixed issue in swaps where certain errors were not being handled (#6017)
+- Fixed a bug with wrapping and unwrapping ETH (#6022, #6026)
+- Fixed a crash that was happening on asset balance (#6025)
+- Fixed missing pricing on swaps (#6023)
+
+## [1.9.35] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.35)
+
+### Added
+
+- Added translations for swaps v2, gas, backups and ETH rewards (#5980)
+- Added a popular tokens section in swaps token search list (#5990)
+
+### Changed
+
+- Bump fast-xml-parser from 4.4.0 to 4.4.1 (#5965)
+- Convert App.js => App.tsx (#5792)
+- No longer have the restricted codeowners for reviews (#5991)
+- Changed the trending Dapps section to backend endpoint (#5974)
+- The default swap input currency is now the network with the most ETH (#5994)
+- Design system improvements (#5984)
+- Dapp browser improvements (#5978)
+- Updated swaps SDK (#5996)
+- Changed the fee domination from USD to actual payment token (#6000)
+- Sentry bot resilience updates (#5995)
+
+### Fixed
+
+- Fixed a crash on an empty profile screen along with adding a placeholder for no transactions on activity screen (#5975)
+- Fixed a bug where some tokens had a missing asset balance (#5998)
+- Fixed account balance discrepancies in different places (#5959)
+
+## [1.9.34] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.34)
+
+### Added
+
+- Added the ability to copy/paste swap inputs (#5938)
+- Added tracking of critical errors to sentry (#5936)
+- Added ability to open in Rainbow from mobile browsers (#5939)
+- Added Degen mode to skip review sheet for swaps (#5933, #5963, #5969)
+- Added ability to set max on a balance when tapping on badge (#5947)
+- Added e2e coverage for manual wallet backups (#5913)
+- Added a hold to swap button on swaps flow (#5920, #5976)
+- Added a new section that shows the last three user swaps per chain (#5956)
+- Added performance tracking on TimeToSign (#5962)
+
+### Changed
+
+- Disabled location APIs in VisionCamera since we don’t use location features (#5942)
+- Removed FULL_SCREEN_INTENT permission from the manifest (#5955)
+- App is now using different referrer for ETH rewards claims (#5954)
+- Bumped Android dependencies (#5960)
+- Updated Degen mode copy and enabled tracking (#5979)
+
+### Fixed
+
+- Fixed a crash on explainer sheet when there wasn’t a read more link (#5945)
+- Fixed a bug where some bridges couldn’t be made due to gas (#5949)
+- Fixed bugs around flipping logic in swap flow (#5948)
+- Fixed issue where there would be a tab swipe from dapp browser on Android devices (#5964)
+- Fixed a bug where one could proceed to review on a swap when they shouldn’t (#5967)
+- Fixed favorites bugs on search list (#5972)
+- Fixed bugs around copy and pasting (#5953)
+- Fixed an old route that led to Swaps v1 (#5971)
+- Fixed a bug that showed an empty space on token to buy list (#5983, #5989)
+- Fixed issues when saving assets as favorites (#5972, #5982)
+
+## [1.9.33] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.33)
+
+## Fixed
+
+- Fixed an issue where swaps / bridges could not be sent due to gas being incorrect (#5949)
+
+## [1.9.32] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.32)
+
+## Changed
+
+- Updated audit issues for CI fixes (#5929)
+- Improved decimal formatter functions (#5918)
+- Simplified SwapInputController animated reaction logic for responding to input value changes (#5923)
+- Updated the swap warning to be a derived value instead of an animated reaction (#5930)
+- Cleaned up swapInputsController that had repeated logic around niceIncrementFormatter (#5931)
+- Upgraded react-native-gesture-handler to v2.17.1 (#5925)
+- Upgraded RN to v0.74.3 and bumped outdated packages (#5739)
+
+## Fixed
+
+- We’re now preventing a crash on remote cards code (#5924)
+- Fixed an issue with the keyboard dismissing option to copy contract address or view on ehterscan from swaps search (#5908)
+- Fixed a bug where changing output asset leads to a weird state (#5934)
+
+## [1.9.31] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.31)
+
+### Fixed
+
+- fixed a bug causing assets in swap to sometimes not reflect your balance (#5919)
+- removed the filtering out of the assetToSell from the currency lists which fixed a bug where ETH wasn't showing in output list (#5921)
+
+## [1.9.30] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.30)
+
+### Fixed
+
+- Fixed a crash that would happen when attempting a max swappable amount (#5907)
+- Fixed an issue where native network token was not at top of verified list (#5906)
+- Fixed an issue when tapping swap button on Degen Token expanded sheet would cause a crash (#5910)
+- Fixed broken searching of local and cross network search (#5912)
+- Fixed an issue where we would do an uncessary approval when unwrapping WETH (#5911)
+
+## [1.9.28] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.28)
+
+### Changed
+
+- rewards UI cleanup (#5896)
+- e2e change of rerunning only failed tests (#5878)
+- enable unit tests (#5874)
+- rewards flag is now enabled by default (#5899)
+
+### Fixed
+
+- Fixed an issue where firebase wasn't working correctly on Android (#5898)
+
+## [1.9.27] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.27)
+
+### Added
+
+- Added more analytics to our Dapp browser (#5755)
+- Added e2e test for validating malicious Dapp warnings (#5764)
+- Added more analytics for Swaps v2 (#5805)
+- Use ens graph api key (#5848, #5882)
+- ETH Rewards (#5866)
+
+### Changed
+
+- Improved performance by limiting Sentry tracking and NFT hooks (#5819)
+- Migrate remote cards over to zustand (#5796)
+
+### Fixed
+
+- Fixed provider recursion bug where getProviderForNetwork was being repeatedly called (#5829)
+- Fixed crashes to swaps v2 flows (#5839)
+- Fixed a crash when attempting to swap on v1 (#5858)
+- Fixed a bug where we weren’t taking l1 op gas fees into account for claimBridge (#5889)
+- Fixed a bug where tapping swap button on token expanded state did not select the proper token (#5891)
+
+## [1.9.25] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.25)
+
+### Added
+
+- Added IDFA check on app launch (#5653)
+- Added parallel tests for e2e (#5786)
+
+### Changed
+
+- Changed the size of the coin icon (#5771)
+- Updates to Swaps v2 (#5768, #5765, #5772, #5766, #5757, #5776, #5775, #5780, #5778, #5779, #5784, #5782, #5754, #5783, #5791, #5795)
+- Bumped reanimated (#5683)
+
+### Fixed
+
+- Fixed a bug where incorrect data would show in pending transactions (#5777)
+- Fixed a bug where the swap warning flashes when typing a larger number (#5769)
+- Fixed UX on receive sheet QR Code (#5672)
+
+## [1.9.24] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.24)
+
+### Added
+
+- Added new translations for various parts in the app (#5762)
+
+### Changed
+
+- Updated codeowners file (#5732, #5743)
+- Swaps v2 updates (#5725, #5727, #5733, #5722, #5724, #5741, #5747, #5748, #5751, #5752, #5758, #5759, #5760)
+- Increased timeout to open a new tab in dapp browser for promo cards (#5745)
+
+### Fixed
+
+- Fixed a bug where some mints with unknown price was showing as free (#5750)
+- Fixed issues with NFTs causing crashes on some wallets (#5761)
+- Fixed an issue where transaction sheet would show the Buy ETH button when the selected wallet already has ETH (#5763)
+
+## [1.9.23] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.23)
+
+### Added
+
+- Added a new useSyncSharedValue hook that makes it easy to keep a shared value in sync with equivalently typed state (#5662, #5664)
+- Implemented smaller state subscriptions for current zustand stores outside of the browser (#5661)
+- Implemented dapp browser architecture (#5669, #5671)
+- Handle web injection natively (#5677)
+- Added a new zustand store creator called createRainbowStore (#5689)
+- Added a new hook called useSharedValueState (#5698)
+- Added new hooks for working with time in reanimated (#5699)
+- Added documentation to reanimated hooks (#5701)
+- Added new backend-provided explorer labels for swaps v2 (#5690)
+- Added custom gas panel for swaps v2 (#5647)
+- Added the ability for a user to name a newly created wallet group in backups flow (#5696)
+- Added exchange rate bubble for swaps v2 flow on swap screen (#5723)
+- Added privacy manifest (#5736)
+
+### Changed
+
+- Simplified logic for Rainbow fee display in review panel for swaps v2 (#5660)
+- Upgraded swaps sdk to 0.19.0 (#5694)
+- Moved around swaps functionality that were being used in other places (#5708)
+- Swaps v2 re-architecture implementation (#5705)
+- Migrated nft requests from nft proxy to nfts graphql endpoint (#5704)
+- Bumped provider to improve connection flow to dapps and L2 connection issues (#5703)
+- Integrated new arch into asset colors for swaps v2 (#5709)
+- Improvements to swaps quote fetching (#5711)
+- Replaced swaps redux reliant state with parity to browser extension (#5608)
+
+### Fixed
+
+- Fixed a bug where dapp connection warning was not being displayed (#5710)
+- Fixed an issue where there’s no web3 provider injected on the current tab when doing an app cold start (#5663)
+- Fixed a bug where Google login button wouldn’t load on certain sites (#5670)
+- Fixed issues relating to account/network switching by refactoring AppSessionsStore to use RainbowStore (#5693)
+- Fixed numerous issues that arose from dapp browser bug bash session (#5695)
+- Fixed an issue with bridge assets and spacing between items for Swaps v2 (#5686)
+- Fixed supporting chain Id’s matching behavior with browser extension (#5697)
+- Fixed a bug where a newly created wallet with a custom name would have the address but not the custom name displayed in backups (#5692)
+- Fixed UI bug where Learn More Backups sheet was clipped at the topped (#5687)
+- Fixed a bug with favorites list on swaps v2 (#5659)
+- Fixed issue with running e2e tests by disabling sentry (#5707)
+- Fixed a bug where there weren’t any touch events executed on the webview (#5702)
+- Fixed a bug with dapp browser open in new tab (#5688)
+- Fixed a bunch of dapp browser bugs on Android devices (#5712, #5715)
+- Fixed a bug with searching in dapp browser that now allows you to navigate to an exact URL instead of suggested (#5719)
+- Fixed browser bugs and improved performance (#5721)
+- Fixed a bug on account switching from control panel on browser (#5726)
+- Fixed various bugs within the control panel on the browser (#5730, #5734, #5735)
+- Fixed search logic and homepage empty state bugs on browser (#5737)
+- Fixed an addys API error when no address is provided (#5729)
+- Fixed a swaps bug where chainID was undefined (#5738)
+- Fixed a crash when tapping settings while bridging in swaps flow (#5740)
+
+## [1.9.22] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.22)
+
+### Added
+
+- Swaps v2 updates (#5601, #5635, #5632, #5630, #5643, #5648, #5650, #5649)
+- We now show total USD value of wallet instead of just mainnet ETH balance inside the wallet switcher (#5631)
+
+### Changed
+
+- Updated booleans in remote config (#5627)
+- Removed codepush and unused updates to token list (#5622)
+- Copy update when sending on different networks (#5495)
+- Updates to e2e (#5637)
+- bumped sentry to latest sdk (#5640)
+- Updated firebase to better support notifications deeplinks and Apple privacy warnings (#5636)
+
+### Fixed
+
+- Fixed an edge case in swaps v2 when choosing to swap assets (#5644)
+- Fixed a bug where send sheet USD value was marked as ETH (#5665)
+- Fixed crash when swapping Degen token to ProxySwap token (#5667)
+
+## [1.9.21] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.21)
+
+### Added
+
+- Added support for other native currencies in transaction simulation sheet (#5585)
+- implement gas estimations for swaps v2 (#5526)
+- Add token search logic and ability to select assets for swaps v2 (#5547)
+- Added warning for when price impact is unknown (#5597)
+- Added a warning when user attempts to send to contract address (#5586)
+- Added support for Degen chain (#5621)
+
+### Changed
+
+- Updated audit for dependencies (#5594, #5615, #5624)
+- Bumped swaps SDK (#5583)
+- Improved type checking and error handling on web preferences (#5607)
+- Updated e2e test suite (#5558)
+- Updated transaction request analytic events (#5589)
+- Cleaned up file imports and duplicate types for swaps v2 (#5619)
+- Improved Wallet Connect flow and added performance tracking (#5616)
+
+### Fixed
+
+- Fixed an issue with scrolltoindex firing on the last card dismissal (#5606)
+- Fixed a bug where some NFTs won’t show up in wallet (#5537)
+- Fixed an bug where non backed up wallets would show as backed up under certain conditions (#5593)
+- Fixed dapp metadata issues regarding Zora mints (#5584)
+
+## [1.9.20] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.20)
+
+### Added
+
+- Added pending transaction indicator on nav bar (#5529)
+- Swaps v2 revamp work (#5536, #5538)
+- Added wallet connect v2 sessions data to state dump (#5382)
+
+### Changed
+
+- e2e cleanup (#5540)
+- NFT offers/mints gas estimation improvements (#5448)
+- Removed Apollo client in favor of @/graphql (#5555)
+- Refetch balances after a transaction is confirmed (#5551)
+- Hide favorites on non mainnet assets (#5565)
+- Updated transaction details sheet (#5535)
+- Bump Rudderstack version to v1.12.12 (#5556)
+- Backups v2 (#5310)
+
+### Fixed
+
+- Fixed a crash that happened when tapping settings button on develop (#5544)
+- Fixed token metadata issues for searching by contract address in discover (#5563)
+
+## [1.9.19] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.19)
+
+### Added
+
+- Added Blast to simplehash (#5492)
+- Initialize new swaps configuration (#5498)
+- Initial swaps work (#5500)
+
+### Changed
+
+- Swipe navigator performance refactor (#5479)
+- Transaction and assets cleanup (#5459)
+- Migrated query persist from AsyncStorage to mmkv (#5404, #5524)
+- Webview refactor (#5499)
+- Replaced Segment (#5474)
+- Low fee's on first estimate (#5503)
+- Upgraded reservoir (#5514)
+- Bump reanimated to v3.8.0 (#5517)
+- Changed default theme from light to system (#5518)
+- Updated logic for wallet connect SignTransactionSheet (#5471)
+
+### Fixed
+
+- Fixed reanimated and RNGH imports (#5480)
+- Fixed layout shift for mints carousel card (#5485)
+- Fixed android clipboard alerts (#5486)
+- Fixed weekly earnings points breakdown (#5469)
+- Fixed tappable area on wallet name (#5496)
+- Fixed null deconstruction for wallet connect (#5493)
+- Fixed dark mode theme which impacted ENS confirmation screen (#5502)
+- Fixed initiating render on NFT offers (#5501)
+
+## [1.9.18] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.18)
+
+### Added
+
+- Added ability to report NFT as spam to simplehash (#5434)
+- Added fallback icons for contract interactions where we may not have nft images (#5456)
+- Added support for Avalanche (#5430)
+- Added support for Blast (#5463)
+
+### Changed
+
+- Removed native advanced settings as dev settings is newly preferred (#5416)
+- App icon refactor (#5444)
+- null safety placed on input filed focus (#5446)
+- Points referrals card refactor (#5367)
+- Removed duplicate rows in sign transaction sheet (#5451)
+- Upgrade reanimated (#5200)
+- Bumped dependencies for Wallet Connect (#5400)
+- Disabled and removed Flipper (#5464)
+- Removed rn-worklet-core package (#5465)
+
+### Fixed
+
+- Fixed rainbow animation on home screen (#5440)
+- Fixed crash when tapping network info button on L2 sends (#5429)
+- Fixed identify calls for analytics (#5442)
+- Polished pending transaction details UI (#5441)
+- Fixed ability to save NFT as an image on device (#5447)
+- Increased number of pixel difference needed to qualify as non-gesture mode navigation (#5460)
+- Fixed approval number formatting (#5457)
+- Fixed mint pending label (#5455)
+- Fixed a null response that was impacting dapps using viem/wagmi (#5454)
+
+## [1.9.17] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.17)
+
+### Added
+
+- added transferTo field in send details (#5384)
+- added accent colors to NFTs (#5412)
+- added translations for points, notification strings and new wallet connect strings (#5412)
+- added sell button to the NFT expanded state if an offer exists (#5428)
+
+### Changed
+
+- removed unused dependencies and updated some (#5417, #5427)
+- transactions refactor (#5369)
+- coin icon refactor (#5418)
+
+### Fixed
+
+- reduced imgix usage to fix NFT issues (#5413)
+
+## [1.9.16] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.16)
+
+### Added
+
+- Added zustand and core pendingTx state (#5383)
+
+### Changed
+
+- Bump prettier from 2.2.1 to 3.2.5 (#5386)
+- updated transaction queries (#5385)
+- migrated nonce management to zustand (#5395)
+- took portfolio off of websocket (#5371)
+- migrate pinned and hidden tokens (#5410)
+
+### Fixed
+
+- bumped eth-sig-util to fix signing issues (#5376)
+- fixed wallet connect issue with incompatible namespaces (#5387)
+- fixed white screen on Zora mints (#5411)
+
+## [1.9.15] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.15)
+
+### Added
+
+- Added ability to get price impact on swap (#5335, #5351, #5354, #5356)
+- Points tweaks for better error handling (#5341, #5362)
+- Added native value to currency rows (#5374)
+- Added rainbow smol NFT address to unlock icon (#5381)
+
+### Changed
+
+- SVG sanitization (#5342)
+- Removed savings code (#5344)
+- Removed swaps generic assets references (#5345)
+- useAsset hooks clean up (#5350)
+- Removed all logic for DPI (#5343)
+- Removed networks from assetType (#5364)
+- Migrated charts to Addys REST API (#5370)
+- Migrated asset prices to Addys REST API (#5357)
+- Disabled frame processor for vision camera to fix Android builds (#5379)
+
+### Fixed
+
+- Fixed an issue where non compatible asset types were being sent on the new balances endpoint (#5349)
+- Fixed an issue where the block explorer link was incorrect on an l2 transaction (#5333)
+- Fixed e2e flakiness (#5346)
+- Fixed zero eth check (#5361)
+- Fixed profiles deeplinks (#5365)
+- Fixed marketing route props for points push notification (#5366)
+- Fixed centralization to arc client selection (#5368)
+- Fixed an overflowing context menu on Android NFT expanded view (#5339)
+- Fixed remote card on points tab not appearing (#5372)
+- Fixed a bug where Tuesday’s would show same day on week end (#5338)
+- Fixed camera component (#5355)
+- Fixed issue where networks weren’t updated properly for selected assets (#5389)
+- Fixed a WC issue where if on a different wallet then connected one then a formatting issue would occur (#5390)
+- Fixed extra spacing on coin row icons (#5391)
+- Fixed an icon not working on points remote card on Android devices (#5392)
+- Added data for curated tokens (#5396)
+- Fixed selecting max bug on native swaps (#5399)
+
+## [1.9.14] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.14)
+
+### Added
+
+- Included new contract address to unlock Smol icon (#5311)
+- Backend driven cards (#5198)
+- Points notifications toggle opt-out (#5329)
+
+### Changed
+
+- Upgraded camera package (#5178)
+- Bumped fastlane (#5331)
+
+### Fixed
+
+- Bumped react-native-linear-gradient (#5328)
+- Fixes to rank cards in points tab (#5332)
+
+## [1.9.13] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.13)
+
+### Added
+
+- More translations for newer features (#5292)
+
+### Changed
+
+- Remove testnet option from developer settings (#5308)
+- Update what logs get sent to sentry (#5309)
+
+## [1.9.12] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.12)
+
+### Added
+
+- Added the ability to paste full link into ref code input (#5252)
+- Added debug logs for cross-chain bug discovery (#5246)
+- Added sorting to NFTs (#5270)
+- Added support for handling unknown error types (#5279)
+
+### Changed
+
+- Prevent input autofocus if referral code is already validated (#5244)
+- remove rainbow emojis from tweet intent (#5249)
+- Hide referral section on watched wallets (#5250)
+- Rank card formatting tweaks (#5259)
+- Updated next drop formatting to include minutes and day (#5263)
+- Remote Promo Sheets ability to check for points (#5261)
+- Updated rank card to accommodate for large num (#5265)
+- Updated formatting on rank and tweet intent total points (#5251)
+- Changes to the swap entry point to be the main swap screen instead of the currency select modal (#5247)
+- Refactor points sign in (#5268)
+- Cleaned up NFT sorting (#5289)
+- Changed UI for unranked users (#5293)
+- Remote config overhaul (#5297)
+
+### Fixed
+
+- Fixed total points not updating when switching wallets on Android (#5243)
+- Fixed an onboarding error to points with sign in (#5257)
+- Fixed max width on ENS name for leaderboard formatting issue (#5258)
+- Fixed logic to refetch points after next drop and onboarding (#5260)
+- Fixed .toLowercase() on undefined (#5267)
+- Fixed displaying WalletConnect v2 list items that don't have an icon (#5266)
+- Fixed newline encoding on Android (#5280)
+- Fixed bug that makes it possible for read-only wallets to enter onboarding flow after deeplinking in from a referral link (#5281)
+- Fixed NFT sort by floor price (#5284)
+- Fixed no trade routes appearing on swaps (#5287) (#5295)
+
+## [1.9.11] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.11)
+
+### Added
+
+- Points v1 (#5174)
+- Graphql api key (#5211)
+- Ability to implement general marketing notifications (#5206)
+- Enabled Zora for transaction simulation (#5226)
+
+### Changed
+
+- Handling of hex transaction types (#5214)
+- Updated client to use new token search aggregator across networks (#5190)
+- Updated messaging on warnings for transaction simulation (#5224)
+- Improved error handling for unknown urls (#5213)
+- Allow special characters in featured mint titles (#5239)
+
+### Fixed
+
+- Fixed swap input currencylist value bug (#5221)
+- Fixed scroll issue on discover search (#5227)
+- Fixed a crash that would intermittently happen when switching wallets (#5232)
+
+## [1.9.10] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.10)
+
+### Added
+
+- Tx Simulation (#5177)
+- RPC Proxy updates (#5169)
+- Remote promo sheet capabilities (#5140)
+
+### Changed
+
+- ‘An error occurred’ popup changes (#5187)
+
+### Fixed
+
+- Android navigation bar now matches app theme (#5150)
+- Infinite render on swaps modal bug (#5191)
+
+## [1.9.9] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.9)
+
+### Added
+
+- Bug fixes
+- WC improvements
+
+## [1.9.8] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.8)
+
+### Added
+
+- WC dapp warnings
+- e2e updates
+- Fee updates to NFT Mints
+- Account Asset improvements
+
+## [1.9.7] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.7)
+
+### Added
+
+- points v0
+- prompt app reviews
+- bug fixes
+
+## [1.9.6] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.6)
+
+### Added
+
+- in app mints
+- i18n support
+- Rainbow Tabs
+- OP Rewards Round 2
+- more user pain points fixes
+
+## [1.9.5] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.5)
+
+### Added
+
+- WC improvements
+- Gas improvements
+- NFT Offers networks support
+- Wallet loading state fix
+- Other bug fixes & improvements
+
+## [1.9.4] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.4)
+
+### Added
+
+- Mints feature
+- detox e2e fixes
+- WC version bumps & fixes
+- Gas fixes
+
+## [1.9.3] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.3)
+
+### Added
+
+- WC Updates
+
+## [1.9.2] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.2)
+
+### Added
+
+- WC Updates
+- Navigation upgrades
+- 1559 for L2s
+- Adworld app icon
+- F2C updates
+
 ## [1.9.1] (https://github.com/rainbow-me/rainbow/releases/tag/v1.9.1)
 
 ### Added

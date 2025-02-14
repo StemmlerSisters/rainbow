@@ -12,13 +12,7 @@ import { rampGetWidgetURL } from '@/resources/f2c';
 import { WrappedAlert } from '@/helpers/alert';
 import * as lang from '@/languages';
 
-export function Ramp({
-  accountAddress,
-  config,
-}: {
-  accountAddress: string;
-  config: ProviderConfig;
-}) {
+export function Ramp({ accountAddress, config }: { accountAddress: string; config: ProviderConfig }) {
   return (
     <ButtonPressAnimation
       onPress={async () => {
@@ -41,13 +35,13 @@ export function Ramp({
             sessionId,
           });
 
-          logger.info('F2C: opening provider', {
+          logger.debug('[AddCash]: opening provider', {
             provider: FiatProviderName.Ramp,
           });
 
           Linking.openURL(url);
         } catch (e) {
-          logger.error(new RainbowError('F2C: failed to open provider'), {
+          logger.error(new RainbowError('[AddCash]: failed to open provider'), {
             provider: FiatProviderName.Ramp,
             message: (e as Error).message,
           });

@@ -12,13 +12,7 @@ import { coinbaseGetWidgetURL } from '@/resources/f2c';
 import { WrappedAlert } from '@/helpers/alert';
 import * as lang from '@/languages';
 
-export function Coinbase({
-  accountAddress,
-  config,
-}: {
-  accountAddress: string;
-  config: ProviderConfig;
-}) {
+export function Coinbase({ accountAddress, config }: { accountAddress: string; config: ProviderConfig }) {
   return (
     <ButtonPressAnimation
       onPress={async () => {
@@ -40,13 +34,13 @@ export function Coinbase({
             sessionId,
           });
 
-          logger.info('F2C: opening provider', {
+          logger.debug('[AddCash]: opening provider', {
             provider: FiatProviderName.Coinbase,
           });
 
           Linking.openURL(url);
         } catch (e) {
-          logger.error(new RainbowError('F2C: failed to open provider'), {
+          logger.error(new RainbowError('[AddCash]: failed to open provider'), {
             provider: FiatProviderName.Coinbase,
             message: (e as Error).message,
           });

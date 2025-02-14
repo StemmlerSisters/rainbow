@@ -1,25 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import ENSAvatarGrid from '../../assets/ensAvatarGrid.png';
 import ENSIcon from '../../assets/ensIcon.png';
 import { useNavigation } from '../../navigation/Navigation';
 import ImgixImage from '../images/ImgixImage';
 import { enableActionsOnReadOnlyWallet } from '@/config';
-import {
-  Bleed,
-  Box,
-  ColorModeProvider,
-  Column,
-  Columns,
-  Stack,
-  Text,
-} from '@/design-system';
-import {
-  prefetchENSAvatar,
-  prefetchENSRecords,
-  useAccountENSDomains,
-  useDimensions,
-  useWallets,
-} from '@/hooks';
+import { Bleed, Box, ColorModeProvider, Column, Columns, Stack, Text } from '@/design-system';
+import { prefetchENSAvatar, prefetchENSRecords, useAccountENSDomains, useDimensions, useWallets } from '@/hooks';
 import Routes from '@/navigation/routesNames';
 import { watchingAlert } from '@/utils';
 import { GenericCard, Gradient } from './GenericCard';
@@ -47,8 +33,15 @@ export const ENSCreateProfileCard = () => {
   // 40 represents the horizontal padding outside the card
   const imageWidth = deviceWidth - 40;
 
-  const handlePress = () => {
+  const { uniqueDomain } = useAccountENSDomains();
+
+  const handlePress = useCallback(() => {
     if (!isReadOnlyWallet || enableActionsOnReadOnlyWallet) {
+      if (uniqueDomain?.name) {
+        prefetchENSAvatar(uniqueDomain.name);
+        prefetchENSRecords(uniqueDomain.name);
+      }
+
       analyticsV2.track(analyticsV2.event.cardPressed, {
         cardName: 'ENSCreateProfileCard',
         routeName,
@@ -60,25 +53,11 @@ export const ENSCreateProfileCard = () => {
     } else {
       watchingAlert();
     }
-  };
-
-  const { uniqueDomain } = useAccountENSDomains();
-
-  useEffect(() => {
-    if (uniqueDomain?.name) {
-      prefetchENSAvatar(uniqueDomain.name);
-      prefetchENSRecords(uniqueDomain.name);
-    }
-  }, [uniqueDomain]);
+  }, [isReadOnlyWallet, navigate, routeName, uniqueDomain?.name]);
 
   return (
     <ColorModeProvider value="lightTinted">
-      <GenericCard
-        gradient={GRADIENT}
-        onPress={handlePress}
-        testID="ens-create-profile-card"
-        type={cardType}
-      >
+      <GenericCard gradient={GRADIENT} onPress={handlePress} testID="ens-create-profile-card" type={cardType}>
         <Stack space="28px">
           <Columns>
             <Column>
@@ -92,12 +71,7 @@ export const ENSCreateProfileCard = () => {
               </Stack>
             </Column>
             <Column width="content">
-              <Box
-                alignItems="center"
-                width={{ custom: ORB_SIZE }}
-                height={{ custom: ORB_SIZE }}
-              >
-                {/* @ts-expect-error JavaScript component */}
+              <Box alignItems="center" width={{ custom: ORB_SIZE }} height={{ custom: ORB_SIZE }}>
                 <Box
                   as={ImgixImage}
                   marginTop="-12px"
@@ -117,7 +91,6 @@ export const ENSCreateProfileCard = () => {
               alignItems="center"
               justifyContent="center"
             >
-              {/* @ts-expect-error JavaScript component */}
               <Box
                 as={ImgixImage}
                 alignItems="center"

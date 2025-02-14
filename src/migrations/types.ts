@@ -11,6 +11,17 @@ export enum MigrationName {
   deleteImgixMMKVCache = 'migration_deleteImgixMMKVCache',
   migrateNotificationSettingsToVersion2 = 'migration_migrateNotificationSettingsToVersion2',
   prepareDefaultNotificationGroupSettingsState = 'migration_addDefaultNotificationGroupSettings',
+  changeLanguageKeys = 'migration_changeLanguageKeys',
+  fixHiddenUSDC = 'migration_fixHiddenUSDC',
+  purgeWcConnectionsWithoutAccounts = 'migration_purgeWcConnectionsWithoutAccounts',
+  migratePinnedAndHiddenTokenUniqueIds = 'migration_migratePinnedAndHiddenTokenUniqueIds',
+  migrateUnlockableAppIconStorage = 'migration_migrateUnlockableAppIconStorage',
+  migratePersistedQueriesToMMKV = 'migration_migratePersistedQueriesToMMKV',
+  migrateRemotePromoSheetsToZustand = 'migration_migrateRemotePromoSheetsToZustand',
+  migrateFavoritesV2 = 'migration_migrateFavoritesV2',
+  migrateFavoritesV3 = 'migration_migrateFavoritesV3',
+  removeDuplicateRecentSwaps = 'migration_removeDuplicateRecentSwaps',
+  migrateNotificationSettingsToVersion3 = 'migration_migrateNotificationSettingsToVersion3',
 }
 
 export type Migration = {

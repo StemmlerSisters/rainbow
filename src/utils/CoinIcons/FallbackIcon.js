@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 const sx = StyleSheet.create({
   container: {
@@ -28,29 +29,19 @@ function formatSymbol(symbol, width) {
   const key = `${symbol}-${width}`;
 
   if (!_cache[key]) {
-    _cache[key] = symbol
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .substring(0, width < 30 ? 1 : 5);
+    _cache[key] = symbol.replace(/[^a-zA-Z0-9]/g, '').substring(0, width < 30 ? 1 : 5);
   }
 
   return _cache[key];
 }
 
-const FallbackIcon = ({
-  color = '#3A3D51',
-  height,
-  style,
-  symbol = '',
-  textStyles,
-  width,
-  ...props
-}) => {
+const FallbackIcon = ({ color = '#3A3D51', height, style, symbol = '', textStyles, width, ...props }) => {
   const formattedSymbol = formatSymbol(symbol, width);
 
   const fontSize = buildFallbackFontSize(formattedSymbol, width);
 
   return (
-    <View
+    <Animated.View
       {...props}
       style={[
         sx.container,
@@ -63,14 +54,11 @@ const FallbackIcon = ({
       ]}
     >
       <Text style={[sx.text, { fontSize }, textStyles]}>{formattedSymbol}</Text>
-    </View>
+    </Animated.View>
   );
 };
 
 const arePropsEqual = (prev, next) =>
-  prev.color === next.color &&
-  prev.shadowColor === next.shadowColor &&
-  prev.size === next.size &&
-  prev.symbol === next.symbol;
+  prev.color === next.color && prev.shadowColor === next.shadowColor && prev.size === next.size && prev.symbol === next.symbol;
 
 export default React.memo(FallbackIcon, arePropsEqual);

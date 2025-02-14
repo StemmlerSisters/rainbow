@@ -1,13 +1,3 @@
-export {
-  default as depositCompound,
-  getDepositGasLimit,
-} from './depositCompound';
-export { swap } from './swap';
-export { crosschainSwap } from './crosschainSwap';
-export {
-  default as unlock,
-  assetNeedsUnlocking,
-  estimateApprove,
-} from './unlock';
-export { default as withdrawCompound } from './withdrawCompound';
-export { default as ens } from './ens';
+export { estimateSwapGasLimit, executeSwap, swap } from './swap';
+export { assetNeedsUnlocking, estimateApprove, executeApprove, unlock } from './unlock';
+export { claim } from './claim';

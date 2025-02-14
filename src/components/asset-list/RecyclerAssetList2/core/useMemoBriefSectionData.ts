@@ -2,29 +2,14 @@ import { useMemo } from 'react';
 import { useDeepCompareMemo } from 'use-deep-compare';
 import { AssetListType } from '..';
 import { CellType, CoinExtraData, NFTFamilyExtraData } from './ViewTypes';
-import {
-  useCoinListEdited,
-  useCoinListEditOptions,
-  useExternalWalletSectionsData,
-  useOpenFamilies,
-  useOpenInvestmentCards,
-  useOpenSavings,
-  useOpenSmallBalances,
-  useWalletSectionsData,
-} from '@/hooks';
+import { useCoinListEdited, useExternalWalletSectionsData, useOpenFamilies, useOpenSmallBalances, useWalletSectionsData } from '@/hooks';
 import useOpenPositionCards from '@/hooks/useOpenPositionCards';
+import useOpenClaimables from '@/hooks/useOpenClaimables';
+import { useUserAssetsStore } from '@/state/assets/userAssets';
 
 const FILTER_TYPES = {
-  'ens-profile': [
-    CellType.NFT_SPACE_AFTER,
-    CellType.NFT,
-    CellType.FAMILY_HEADER,
-  ],
-  'select-nft': [
-    CellType.NFT_SPACE_AFTER,
-    CellType.NFT,
-    CellType.FAMILY_HEADER,
-  ],
+  'ens-profile': [CellType.NFT_SPACE_AFTER, CellType.NFT, CellType.FAMILY_HEADER],
+  'select-nft': [CellType.NFT_SPACE_AFTER, CellType.NFT, CellType.FAMILY_HEADER],
 } as { [key in AssetListType]: CellType[] };
 
 export default function useMemoBriefSectionData({
@@ -55,11 +40,10 @@ export default function useMemoBriefSectionData({
   }
 
   const { isSmallBalancesOpen } = useOpenSmallBalances();
-  const { isSavingsOpen } = useOpenSavings();
-  const { isInvestmentCardsOpen } = useOpenInvestmentCards();
   const { isPositionCardsOpen } = useOpenPositionCards();
+  const { isClaimablesOpen } = useOpenClaimables();
   const { isCoinListEdited } = useCoinListEdited();
-  const { hiddenCoinsObj } = useCoinListEditOptions();
+  const hiddenAssets = useUserAssetsStore(state => state.hiddenAssets);
   const { openFamilies } = useOpenFamilies();
 
   const result = useMemo(() => {
@@ -73,50 +57,24 @@ export default function useMemoBriefSectionData({
     const filterTypes = type ? FILTER_TYPES[type as AssetListType] : [];
     const briefSectionsDataFiltered = sectionsDataToUse
       .filter((data, arrIndex, arr) => {
-        if (
-          filterTypes &&
-          filterTypes.length !== 0 &&
-          !filterTypes.includes(data.type)
-        ) {
+        if (filterTypes && filterTypes.length !== 0 && !filterTypes.includes(data.type)) {
           return false;
         }
 
-        if (
-          arr[arrIndex - 1]?.type === CellType.COIN &&
-          data.type !== CellType.COIN_DIVIDER &&
-          data.type !== CellType.COIN
-        ) {
+        if (arr[arrIndex - 1]?.type === CellType.COIN && data.type !== CellType.COIN_DIVIDER && data.type !== CellType.COIN) {
           afterCoins = true;
         }
         if (afterCoins && isCoinListEdited) {
           return false;
         }
 
-        // removes NFTS_HEADER if wallet doesn't have NFTs
-        if (data.type === CellType.NFTS_HEADER && !arr[arrIndex + 2]) {
-          return false;
-        }
-
-        if (
-          data.type === CellType.PROFILE_STICKY_HEADER ||
-          data.type === CellType.NFTS_HEADER ||
-          data.type === CellType.POSITIONS_HEADER
-        ) {
+        if (data.type === CellType.PROFILE_STICKY_HEADER) {
           stickyHeaders.push(index);
         }
-        if (
-          data.type === CellType.COIN &&
-          !isSmallBalancesOpen &&
-          !isCoinListEdited &&
-          afterDivider
-        ) {
+        if (data.type === CellType.COIN && !isSmallBalancesOpen && !isCoinListEdited && afterDivider) {
           return false;
         }
-        if (
-          data.type === CellType.COIN &&
-          hiddenCoinsObj[(data as CoinExtraData).uniqueId] &&
-          !isCoinListEdited
-        ) {
+        if (data.type === CellType.COIN && hiddenAssets.has((data as CoinExtraData).uniqueId) && !isCoinListEdited) {
           return false;
         }
 
@@ -131,35 +89,20 @@ export default function useMemoBriefSectionData({
           }
         }
 
-        if (data.type === CellType.SAVINGS && !isSavingsOpen) {
-          return false;
-        }
-
         if (data.type === CellType.FAMILY_HEADER) {
           const name = (data as NFTFamilyExtraData).name;
           isGroupOpen = openFamilies[name];
         }
 
-        if (
-          data.type === CellType.NFT ||
-          data.type === CellType.NFT_SPACE_AFTER
-        ) {
+        if (data.type === CellType.NFT || data.type === CellType.NFT_SPACE_AFTER) {
           return isGroupOpen;
         }
 
-        if (
-          (data.type === CellType.POOLS_HEADER ||
-            data.type === CellType.UNISWAP_POOL) &&
-          isCoinListEdited
-        ) {
-          return false;
-        }
-
-        if (data.type === CellType.UNISWAP_POOL && !isInvestmentCardsOpen) {
-          return false;
-        }
-
         if (data.type === CellType.POSITION && !isPositionCardsOpen) {
+          return false;
+        }
+
+        if (data.type === CellType.CLAIMABLE && !isClaimablesOpen) {
           return false;
         }
 
@@ -170,17 +113,7 @@ export default function useMemoBriefSectionData({
         return { type: cellType, uid };
       });
     return briefSectionsDataFiltered;
-  }, [
-    sectionsDataToUse,
-    type,
-    isCoinListEdited,
-    isSmallBalancesOpen,
-    hiddenCoinsObj,
-    isSavingsOpen,
-    isInvestmentCardsOpen,
-    isPositionCardsOpen,
-    openFamilies,
-  ]);
+  }, [sectionsDataToUse, type, isCoinListEdited, isSmallBalancesOpen, hiddenAssets, isPositionCardsOpen, isClaimablesOpen, openFamilies]);
   const memoizedResult = useDeepCompareMemo(() => result, [result]);
   const additionalData = useDeepCompareMemo(
     () =>
